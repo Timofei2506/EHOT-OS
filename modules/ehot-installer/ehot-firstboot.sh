@@ -16,6 +16,10 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "[ehot-firstboot] Запуск первоначальной настройки оборудования EHOT OS..."
 
+if command -v ufw >/dev/null 2>&1; then
+  ufw --force enable || true
+fi
+
 # Auto-detect and install official GPU, Wi-Fi, Bluetooth, and Audio drivers
 if [[ -x /usr/local/sbin/ehot-driver-setup ]]; then
   /usr/local/sbin/ehot-driver-setup || echo "[ehot-firstboot] Предупреждение: драйверы будут доустановлены после появления сети."

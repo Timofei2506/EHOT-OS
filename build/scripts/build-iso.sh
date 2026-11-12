@@ -47,6 +47,20 @@ unsquashfs -d "$SQUASH_ROOT" "$ISO_EXTRACT/casper/filesystem.squashfs"
 # Free ~2.9 GB immediately since filesystem.squashfs will be rebuilt in step 5
 rm -f "$ISO_EXTRACT/casper/filesystem.squashfs"
 
+# Extract El Torito boot params BEFORE optionally deleting BASE_ISO to save ~2.9 GB
+ELTORITO_ARGS_FILE="$WORK_DIR/xorriso_boot_args.txt"
+xorriso -indev "$BASE_ISO" -report_el_torito as_mkisofs 2>/dev/null > "$ELTORITO_ARGS_FILE"
+if [[ "$KEEP_BASE_ISO" == "0" ]] && ! grep -q -- "-append_partition" "$ELTORITO_ARGS_FILE"; then
+  dd if="$BASE_ISO" of="$WORK_DIR/mbr_header.bin" bs=2048 count=16 status=none
+  python3 - "$ELTORITO_ARGS_FILE" "$BASE_ISO" "$WORK_DIR/mbr_header.bin" <<'PY'
+import sys
+p, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
+txt = open(p, encoding="utf-8").read()
+open(p, "w", encoding="utf-8").write(txt.replace(old, new))
+PY
+  rm -f "$BASE_ISO"
+fi
+
 echo "[4/7] Подготовка chroot-окружения и кастомизация EHOT OS..."
 cleanup_chroot() {
   set +e
@@ -82,19 +96,8 @@ cleanup_chroot
 trap - EXIT
 : > "$SQUASH_ROOT/etc/resolv.conf"
 
-# Copy updated kernel/initrd to ISO casper if initramfs changed
-if compgen -G "$SQUASH_ROOT/boot/vmlinuz-*" >/dev/null; then
-  LATEST_VMLINUZ="$(find "$SQUASH_ROOT/boot" -maxdepth 1 -name 'vmlinuz-*' | sort -V | tail -n1)"
-  cp -f "$LATEST_VMLINUZ" "$ISO_EXTRACT/casper/vmlinuz"
-fi
-if compgen -G "$SQUASH_ROOT/boot/initrd.img-*" >/dev/null; then
-  LATEST_INITRD="$(find "$SQUASH_ROOT/boot" -maxdepth 1 -name 'initrd.img-*' | sort -V | tail -n1)"
-  if [[ -f "$ISO_EXTRACT/casper/initrd.lz" ]]; then
-    cp -f "$LATEST_INITRD" "$ISO_EXTRACT/casper/initrd.lz"
-  else
-    cp -f "$LATEST_INITRD" "$ISO_EXTRACT/casper/initrd"
-  fi
-fi
+# Keep original casper /casper/vmlinuz & /casper/initrd.lz intact so casper-uuid stays 100% synced
+# with /.disk/casper-uuid-generic, grub.cfg, and isolinux/live.cfg (target HDD rebuilds initramfs in ehot-install).
 
 echo "[5/7] Обновление манифестов, упаковка filesystem.squashfs (zstd)..."
 # shellcheck disable=SC2016
@@ -111,13 +114,18 @@ printf '%s' "$(du -sx --block-size=1 "$SQUASH_ROOT" | cut -f1)" > "$ISO_EXTRACT/
 # Free space early if requested (e.g. on CI runners)
 rm -rf "$SQUASH_ROOT"
 
-# Customize GRUB live menu labels safely while preserving original casper parameters
+# Customize GRUB & ISOLINUX live menu labels safely while preserving original casper parameters & uuid
 for cfg in "$ISO_EXTRACT/boot/grub/grub.cfg" "$ISO_EXTRACT/boot/grub/loopback.cfg"; do
   if [[ -f "$cfg" ]]; then
+    sed -i 's/Start Linux Mint .* (compatibility mode)/EHOT OS 22.3 (Безопасный режим графики)/g' "$cfg"
     sed -i 's/Start Linux Mint [^"]*/EHOT OS 22.3 (Запуск и установка)/g' "$cfg"
-    sed -i 's/(compatibility mode)/(Безопасный режим графики)/g' "$cfg"
   fi
 done
+if [[ -f "$ISO_EXTRACT/isolinux/live.cfg" ]]; then
+  sed -i 's/Welcome to Linux Mint .*/Welcome to EHOT OS 22.3 (Linux Mint XFCE Base)/g' "$ISO_EXTRACT/isolinux/live.cfg"
+  sed -i 's/menu label Start Linux Mint in compatibility mode/menu label Start EHOT OS (Safe Graphics \/ nomodeset)/g' "$ISO_EXTRACT/isolinux/live.cfg"
+  sed -i 's/menu label Start Linux Mint$/menu label Start EHOT OS (Live + Install)/g' "$ISO_EXTRACT/isolinux/live.cfg"
+fi
 if [[ -f "$ISO_EXTRACT/.disk/info" ]]; then
   echo "EHOT OS 1.0.0 (Linux Mint 22.3 Zena XFCE amd64)" > "$ISO_EXTRACT/.disk/info"
 fi
@@ -134,9 +142,7 @@ echo "[7/7] Сборка гибридного UEFI + Legacy BIOS ISO через 
 OUTPUT_ISO="$OUT_DIR/$EHOT_ISO_FILENAME"
 rm -f "$OUTPUT_ISO" "$OUTPUT_ISO.sha256"
 
-# Extract exact El Torito + GPT/MBR boot parameters from official base ISO
-ELTORITO_ARGS_FILE="$WORK_DIR/xorriso_boot_args.txt"
-xorriso -indev "$BASE_ISO" -report_el_torito as_mkisofs 2>/dev/null > "$ELTORITO_ARGS_FILE"
+# Parse saved El Torito + GPT/MBR boot parameters from official base ISO
 
 # Build python-parsed argument list replacing -V and removing -modification-date / old -part_like_isohybrid quirk
 mapfile -d '' XORRISO_ARGS < <(python3 - "$ELTORITO_ARGS_FILE" "$EHOT_VOLUME_ID" <<'PY'

@@ -20,9 +20,11 @@ apt-get update -qq
 
 # 1. Core system (ZRAM, sysctl, earlyoom, LibreOffice, Firefox, drivers helper, grub binaries)
 bash "$SRC_ROOT/modules/ehot-core/scripts/setup-core.sh" --mode chroot
+apt-get clean
 
 # 2. Gaming subsystem (Steam, Wine, Lutris, GameMode, MangoHud, Vulkan, i386)
 bash "$SRC_ROOT/modules/ehot-gaming/scripts/setup-gaming.sh"
+apt-get clean
 
 # 3. Remote access (AnyDesk from official repo, NO password stored!)
 bash "$SRC_ROOT/modules/ehot-remote/scripts/install-anydesk.sh"
