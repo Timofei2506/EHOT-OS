@@ -206,3 +206,18 @@ def test_reassemble_finds_parts_across_unzipped_sibling_folders(tmp_path):
     assert out_iso.exists()
     assert out_iso.read_bytes() == full
 
+
+def test_reassemble_rejects_lonely_part_aa_without_part_ab(tmp_path):
+    dl = tmp_path / "Downloads"
+    dl.mkdir(parents=True)
+    (dl / "ehot-os-22.3-xfce-amd64.iso.part.aa").write_bytes(b"HALF_ONLY")
+
+    res = subprocess.run(
+        ["bash", str(MAC_SCRIPT), "--self-test-reassemble", str(dl)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert res.returncode == 1
+    assert not (dl / "ehot-os-22.3-xfce-amd64.iso").exists()
+

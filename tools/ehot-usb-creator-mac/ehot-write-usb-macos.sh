@@ -198,8 +198,6 @@ find_or_reassemble_iso() {
     return 1
   fi
 
-  local out_dir="$primary_dir"
-  local target_iso="$out_dir/$DEFAULT_ISO_NAME"
   local part_paths=()
 
   if [[ -n "$parts_sha" && -f "$parts_sha" ]]; then
@@ -210,8 +208,8 @@ find_or_reassemble_iso() {
       part_filename="${part_filename#\*}"
       found_part="$(find_named_file_in_roots "$part_filename" "${search_roots[@]}" || true)"
       if [[ -z "$found_part" ]]; then
-        echo "ОШИБКА: не найдена часть образа '$part_filename' (скачайте и распакуйте оба ZIP-архива из релиза)." >&2
-        return 2
+        echo "[ehot-mac] Не хватает части образа '$part_filename' — потребуется докачка." >&2
+        return 1
       fi
       actual_hash="$(sha256_of_file "$found_part")"
       if [[ "$actual_hash" != "$expected_hash" ]]; then
@@ -227,11 +225,21 @@ find_or_reassemble_iso() {
       p="$(find_named_file_in_roots "${DEFAULT_ISO_NAME}.part.${suffix}" "${search_roots[@]}" || true)"
       [[ -n "$p" ]] && part_paths+=("$p")
     done
+    if [[ "${#part_paths[@]}" -lt 2 ]]; then
+      echo "[ehot-mac] Найдена только часть образа (отсутствует part.ab) — потребуется докачка второй части." >&2
+      return 1
+    fi
   fi
 
   if [[ "${#part_paths[@]}" -eq 0 ]]; then
     return 1
   fi
+
+  local out_dir="$primary_dir"
+  if [[ -n "$part_aa" ]]; then
+    out_dir="$(dirname "$part_aa")"
+  fi
+  local target_iso="$out_dir/$DEFAULT_ISO_NAME"
 
   echo "[ehot-mac] Склейка ${#part_paths[@]} частей в $target_iso (займёт ~15–30 секунд)..." >&2
   cat "${part_paths[@]}" > "$target_iso"
@@ -249,7 +257,7 @@ find_or_reassemble_iso() {
 curl_download_with_resume() {
   local url="$1"
   local dest_zip="$2"
-  local max_attempts=8
+  local max_attempts=30
 
   if [[ -f "$dest_zip" ]] && unzip -tq "$dest_zip" >/dev/null 2>&1; then
     echo "[ehot-mac] Архив $(basename "$dest_zip") уже полностью скачан и проверен."
@@ -260,9 +268,9 @@ curl_download_with_resume() {
   while [[ "$attempt" -le "$max_attempts" ]]; do
     local rc=0
     curl --http1.1 -fL -C - \
-      --connect-timeout 20 \
-      --speed-time 30 \
-      --speed-limit 1024 \
+      --connect-timeout 25 \
+      --speed-time 90 \
+      --speed-limit 256 \
       --progress-bar \
       -o "$dest_zip" \
       "$url" || rc=$?
@@ -294,7 +302,7 @@ download_release_zips_to_dir() {
   local z1="EHOT-OS-v1.0.0-Part1.zip"
   local z2="EHOT-OS-v1.0.0-Part2-and-Tools.zip"
 
-  if [[ ! -f "$dest_dir/${DEFAULT_ISO_NAME}.part.aa" ]]; then
+  if [[ ! -s "$dest_dir/${DEFAULT_ISO_NAME}.part.aa" ]]; then
     echo "[ehot-mac] Скачивание $z1 (~1.8 ГБ, HTTP/1.1 с поддержкой докачки) в $dest_dir..."
     curl_download_with_resume "$RELEASE_BASE_URL/$z1" "$dest_dir/$z1"
     echo "[ehot-mac] Распаковка $z1..."
@@ -450,9 +458,9 @@ main() {
       if [[ $rc -eq 2 ]]; then
         exit 2
       fi
-      echo "Образ $DEFAULT_ISO_NAME или части .part.* локально не найдены."
+      echo "Полный образ $DEFAULT_ISO_NAME (или все его части) локально не найден."
       local dl_ans
-      read -r -p "Скачать автоматически из публичного GitHub Release v1.0.0 (~3.6 ГБ)? [y/N]: " dl_ans
+      read -r -p "Скачать/докачать недостающие файлы из публичного GitHub Release v1.0.0? [y/N]: " dl_ans
       case "$dl_ans" in
         y|Y|yes|YES|д|Д|да|ДА)
           local dl_dir="$HOME/Downloads/EHOT-OS-v1.0.0"
