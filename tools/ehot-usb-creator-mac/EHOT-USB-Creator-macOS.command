@@ -246,23 +246,73 @@ find_or_reassemble_iso() {
   return 0
 }
 
+curl_download_with_resume() {
+  local url="$1"
+  local dest_zip="$2"
+  local max_attempts=8
+
+  if [[ -f "$dest_zip" ]] && unzip -tq "$dest_zip" >/dev/null 2>&1; then
+    echo "[ehot-mac] Архив $(basename "$dest_zip") уже полностью скачан и проверен."
+    return 0
+  fi
+
+  local attempt=1
+  while [[ "$attempt" -le "$max_attempts" ]]; do
+    local rc=0
+    curl --http1.1 -fL -C - \
+      --connect-timeout 20 \
+      --speed-time 30 \
+      --speed-limit 1024 \
+      --progress-bar \
+      -o "$dest_zip" \
+      "$url" || rc=$?
+
+    if [[ "$rc" -eq 0 ]]; then
+      if unzip -tq "$dest_zip" >/dev/null 2>&1; then
+        return 0
+      fi
+      echo "[ehot-mac] Предупреждение: скачанный архив повреждён, перекачиваем заново (попытка $attempt/$max_attempts)..." >&2
+      rm -f "$dest_zip"
+    elif [[ "$rc" -eq 33 ]]; then
+      echo "[ehot-mac] Предупреждение: сервер отклонил диапазон докачки (HTTP 416), начинаем скачивание заново..." >&2
+      rm -f "$dest_zip"
+    else
+      echo "[ehot-mac] Обрыв связи (curl код $rc). Автоматическая докачка через 3 сек (попытка $attempt/$max_attempts)..." >&2
+    fi
+
+    sleep 3
+    attempt=$((attempt + 1))
+  done
+
+  echo "ОШИБКА: не удалось скачать $(basename "$dest_zip") после $max_attempts попыток." >&2
+  return 1
+}
+
 download_release_zips_to_dir() {
   local dest_dir="$1"
   mkdir -p "$dest_dir"
   local z1="EHOT-OS-v1.0.0-Part1.zip"
   local z2="EHOT-OS-v1.0.0-Part2-and-Tools.zip"
 
-  echo "[ehot-mac] Скачивание $z1 (~1.8 ГБ) в $dest_dir..."
-  curl -fL --retry 3 --progress-bar -o "$dest_dir/$z1" "$RELEASE_BASE_URL/$z1"
-  echo "[ehot-mac] Распаковка $z1..."
-  unzip -oq "$dest_dir/$z1" -d "$dest_dir"
-  rm -f "$dest_dir/$z1"
+  if [[ ! -f "$dest_dir/${DEFAULT_ISO_NAME}.part.aa" ]]; then
+    echo "[ehot-mac] Скачивание $z1 (~1.8 ГБ, HTTP/1.1 с поддержкой докачки) в $dest_dir..."
+    curl_download_with_resume "$RELEASE_BASE_URL/$z1" "$dest_dir/$z1"
+    echo "[ehot-mac] Распаковка $z1..."
+    unzip -oq "$dest_dir/$z1" -d "$dest_dir"
+    rm -f "$dest_dir/$z1"
+  else
+    echo "[ehot-mac] Часть ${DEFAULT_ISO_NAME}.part.aa уже есть в $dest_dir — пропуск скачивания $z1."
+  fi
 
-  echo "[ehot-mac] Скачивание $z2 (~1.85 ГБ) в $dest_dir..."
-  curl -fL --retry 3 --progress-bar -o "$dest_dir/$z2" "$RELEASE_BASE_URL/$z2"
-  echo "[ehot-mac] Распаковка $z2..."
-  unzip -oq "$dest_dir/$z2" -d "$dest_dir"
-  rm -f "$dest_dir/$z2"
+  if [[ ! -f "$dest_dir/${DEFAULT_ISO_NAME}.part.ab" || ! -f "$dest_dir/${DEFAULT_ISO_NAME}.parts.sha256" ]]; then
+    echo "[ehot-mac] Скачивание $z2 (~1.85 ГБ, HTTP/1.1 с поддержкой докачки) в $dest_dir..."
+    curl_download_with_resume "$RELEASE_BASE_URL/$z2" "$dest_dir/$z2"
+    echo "[ehot-mac] Распаковка $z2..."
+    unzip -oq "$dest_dir/$z2" -d "$dest_dir"
+    rm -f "$dest_dir/$z2"
+  else
+    echo "[ehot-mac] Часть ${DEFAULT_ISO_NAME}.part.ab уже есть в $dest_dir — пропуск скачивания $z2."
+  fi
 }
 
 flash_raw_with_sudo() {

@@ -89,6 +89,12 @@ def test_mac_script_and_command_are_identical():
     assert MAC_SCRIPT.read_bytes() == MAC_COMMAND.read_bytes()
 
 
+def test_mac_curl_uses_http11_and_resume_to_avoid_http2_stream_error():
+    txt = MAC_SCRIPT.read_text(encoding="utf-8")
+    assert "--http1.1" in txt
+    assert "-C -" in txt
+
+
 def test_accepts_external_usb_flash_drive():
     res = run_parse_test("disk4", SAMPLE_USB_KINGSTON)
     assert res.returncode == 0, res.stdout + res.stderr
