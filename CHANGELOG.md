@@ -9,5 +9,5 @@
 - Модуль `ehot-control`: Python-агент + отдельный модуль Telegram + Firefox MV3 WebExtension + Native Messaging для 4 событий (YouTube, загрузка файла, включение, выключение).
 - Модуль `ehot-branding`: чёрно-фиолетовая тема XFCE/Plymouth/LightDM и слоты для графики маскота-енота с утилитой `ehot-apply-branding`.
 - Модуль `ehot-installer`: безопасный установщик с защитой от форматирования USB-флешки и поддержкой UEFI + Legacy BIOS.
-- Утилиты записи флешки `EHOT-USB-Creator` для Windows (`.exe`) и Linux.
+- Утилиты записи флешки `EHOT-USB-Creator` для Windows (`.exe`), macOS (`.command` / `.sh`) и Linux.
 - GitHub Actions CI/CD: автопроверки, сборка Windows `.exe`, полная сборка ISO + smoke-тест в QEMU.

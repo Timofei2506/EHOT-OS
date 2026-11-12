@@ -21,8 +21,9 @@
 5. **`modules/ehot-branding`** — Модульный чёрно-фиолетовый фирменный стиль EHOT OS (маскот-енот): GTK/XFWM4 тема, конфиги XFCE без тяжёлых эффектов, LightDM, Plymouth, GRUB2 и пустые документированные слоты `assets/` + утилита `ehot-apply-branding` для замены графики от дизайнерского ИИ-агента.
 6. **`modules/ehot-installer`** — Безопасный полуавтоматический установщик с жёсткой проверкой диска (исключение USB-флешки Kingston DataTraveler, проверка модели/размера/интерфейса, явное подтверждение очистки 1 ТБ HDD, создание новой GPT-таблицы и разделов, установка Linux Mint XFCE + модулей EHOT OS, настройка GRUB для UEFI и Legacy BIOS, интерактивное создание пароля для `Regzen`).
 7. **`tools/ehot-usb-creator-win`** — Программа для Windows (`.exe`, .NET 8 WinForms) для безопасной записи образа EHOT OS на флешку Kingston DataTraveler 64 ГБ с фильтром только съёмных USB-дисков, проверкой SHA-256, поддержкой многотомных релизных частей и верификацией записи.
-8. **`tools/ehot-usb-creator-linux`** — Аналогичная безопасная утилита записи флешки под Linux.
-9. **`build/`** — Конфигурация и скрипты воспроизводимой сборки гибридного UEFI+BIOS ISO с проверкой контрольных сумм и автотестом загрузки в QEMU.
+8. **`tools/ehot-usb-creator-mac`** — Безопасный инструмент записи флешки для **macOS** (`EHOT-USB-Creator-macOS.command` / `ehot-write-usb-macos.sh`) на штатных утилитах (`diskutil`, `shasum`, `dd`): автосклейка `.part.*`, защита от системного диска Mac (`disk0`) и верификация записи.
+9. **`tools/ehot-usb-creator-linux`** — Аналогичная безопасная утилита записи флешки под Linux.
+10. **`build/`** — Конфигурация и скрипты воспроизводимой сборки гибридного UEFI+BIOS ISO с проверкой контрольных сумм и автотестом загрузки в QEMU.
 
 ---
 
@@ -31,7 +32,7 @@
 - Документация и техническая оценка: [`docs/01_TECHNICAL_ASSESSMENT.md`](docs/01_TECHNICAL_ASSESSMENT.md)
 - Архитектура модулей: [`docs/02_ARCHITECTURE.md`](docs/02_ARCHITECTURE.md)
 - Сборка ISO (локально и GitHub Actions): [`docs/03_ISO_BUILD_GUIDE.md`](docs/03_ISO_BUILD_GUIDE.md)
-- Запись флешки из Windows (Kingston DataTraveler): [`docs/04_USB_FLASH_GUIDE.md`](docs/04_USB_FLASH_GUIDE.md)
+- Запись флешки из macOS, Windows или Linux (Kingston DataTraveler): [`docs/04_USB_FLASH_GUIDE.md`](docs/04_USB_FLASH_GUIDE.md)
 - Установка на пустой Lenovo: [`docs/05_LENOVO_INSTALL_GUIDE.md`](docs/05_LENOVO_INSTALL_GUIDE.md)
 - Восстановление и обновление: [`docs/06_RECOVERY_GUIDE.md`](docs/06_RECOVERY_GUIDE.md), [`docs/07_UPDATE_AND_MAINTENANCE.md`](docs/07_UPDATE_AND_MAINTENANCE.md)
 - Безопасность б/у ноутбука и прошивки: [`docs/08_SECURITY_AND_FIRMWARE.md`](docs/08_SECURITY_AND_FIRMWARE.md)

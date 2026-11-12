@@ -5,7 +5,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 echo "[1/4] Проверка синтаксиса bash и shellcheck..."
-mapfile -t SH_FILES < <(find . -type f -name '*.sh' -not -path './.git/*' | sort)
+mapfile -t SH_FILES < <(find . -type f \( -name '*.sh' -o -name '*.command' \) -not -path './.git/*' | sort)
 for f in "${SH_FILES[@]}"; do
   bash -n "$f"
 done
