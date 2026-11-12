@@ -44,6 +44,8 @@ chmod -R u+w "$ISO_EXTRACT"
 
 echo "[3/7] Распаковка casper/filesystem.squashfs..."
 unsquashfs -d "$SQUASH_ROOT" "$ISO_EXTRACT/casper/filesystem.squashfs"
+# Free ~2.9 GB immediately since filesystem.squashfs will be rebuilt in step 5
+rm -f "$ISO_EXTRACT/casper/filesystem.squashfs"
 
 echo "[4/7] Подготовка chroot-окружения и кастомизация EHOT OS..."
 cleanup_chroot() {
@@ -98,8 +100,12 @@ echo "[5/7] Обновление манифестов, упаковка filesyst
 # shellcheck disable=SC2016
 chroot "$SQUASH_ROOT" dpkg-query -W --showformat='${Package} ${Version}\n' > "$ISO_EXTRACT/casper/filesystem.manifest"
 rm -f "$ISO_EXTRACT/casper/filesystem.squashfs"
-mksquashfs "$SQUASH_ROOT" "$ISO_EXTRACT/casper/filesystem.squashfs" \
-  -comp zstd -Xcompression-level 15 -noappend
+MEM_TOTAL_MB="$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)"
+MKSQ_OPTS=(-comp zstd -Xcompression-level 12 -noappend)
+if (( MEM_TOTAL_MB < 3200 )); then
+  MKSQ_OPTS+=(-processors 1 -mem 512M)
+fi
+mksquashfs "$SQUASH_ROOT" "$ISO_EXTRACT/casper/filesystem.squashfs" "${MKSQ_OPTS[@]}"
 printf '%s' "$(du -sx --block-size=1 "$SQUASH_ROOT" | cut -f1)" > "$ISO_EXTRACT/casper/filesystem.size"
 
 # Free space early if requested (e.g. on CI runners)
