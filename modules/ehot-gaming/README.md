@@ -4,10 +4,10 @@
 
 ## Установленные компоненты
 - **Steam + Proton**: `steam-installer` + 32-битные библиотеки `i386`.
-- **Wine + Winetricks**: `wine-installer` (официальный метапакет Linux Mint 22.3) + `winetricks`.
+- **Wine + Winetricks**: `wine-installer` (официальный метапакет Linux Mint 22.3) + `wine32` + `winetricks`.
 - **Lutris**: единая библиотека игр и префиксов.
 - **GameMode**: `gamemode` + профиль `/etc/gamemode.ini` (переключение CPU governor в `performance`, приоритет I/O для HDD).
-- **MangoHud**: `mangohud` и `mangohud:i386` с компактным пресетом (`~/.config/MangoHud/MangoHud.conf` — FPS, frametime, RAM, Swap, CPU/GPU).
+- **MangoHud**: `mangohud` с компактным пресетом (`~/.config/MangoHud/MangoHud.conf` — FPS, frametime, RAM, Swap, CPU/GPU).
 - **Vulkan + OpenGL**: `vulkan-tools`, `libvulkan1`, `libvulkan1:i386`, `mesa-vulkan-drivers`, `mesa-vulkan-drivers:i386`.
 - **OpenJDK JRE**: `default-jre` для совместимости с Java-играми (в т.ч. Minecraft после самостоятельной установки лаунчера).
 

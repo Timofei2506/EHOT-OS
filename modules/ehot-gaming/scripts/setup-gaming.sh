@@ -28,6 +28,7 @@ echo "[ehot-gaming] Установка Steam, Wine, Lutris, GameMode, MangoHud, 
 apt-get install -y --no-install-recommends \
   steam-installer \
   wine-installer \
+  wine32 \
   winetricks \
   lutris \
   gamemode \
@@ -35,7 +36,6 @@ apt-get install -y --no-install-recommends \
   libgamemode0 \
   libgamemode0:i386 \
   mangohud \
-  mangohud:i386 \
   vulkan-tools \
   libvulkan1 \
   libvulkan1:i386 \

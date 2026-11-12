@@ -62,6 +62,8 @@ PY
 fi
 
 echo "[4/7] Подготовка chroot-окружения и кастомизация EHOT OS..."
+RESOLV_TARGET=""
+RESOLV_BACKUP_NEEDED=0
 cleanup_chroot() {
   set +e
   umount -lf "$SQUASH_ROOT/dev/pts" 2>/dev/null || true
@@ -70,6 +72,12 @@ cleanup_chroot() {
   umount -lf "$SQUASH_ROOT/sys" 2>/dev/null || true
   umount -lf "$SQUASH_ROOT/run" 2>/dev/null || true
   rm -f "$SQUASH_ROOT/usr/sbin/policy-rc.d"
+  if [[ -n "${RESOLV_TARGET:-}" ]]; then
+    rm -f "$SQUASH_ROOT/etc/resolv.conf"
+    ln -s "$RESOLV_TARGET" "$SQUASH_ROOT/etc/resolv.conf"
+  elif [[ "${RESOLV_BACKUP_NEEDED:-0}" -eq 1 ]] && [[ -f "$SQUASH_ROOT/etc/resolv.conf.ehot-bak" ]]; then
+    mv -f "$SQUASH_ROOT/etc/resolv.conf.ehot-bak" "$SQUASH_ROOT/etc/resolv.conf"
+  fi
 }
 trap cleanup_chroot EXIT
 
@@ -80,7 +88,16 @@ exit 101
 EOF
 chmod 755 "$SQUASH_ROOT/usr/sbin/policy-rc.d"
 
-cp /etc/resolv.conf "$SQUASH_ROOT/etc/resolv.conf"
+# Replace symlinked stub-resolv.conf with a regular file before bind-mounting /run
+# so DNS resolution inside chroot always uses host /etc/resolv.conf, then restore symlink.
+if [[ -L "$SQUASH_ROOT/etc/resolv.conf" ]]; then
+  RESOLV_TARGET="$(readlink "$SQUASH_ROOT/etc/resolv.conf")"
+  rm -f "$SQUASH_ROOT/etc/resolv.conf"
+elif [[ -f "$SQUASH_ROOT/etc/resolv.conf" ]]; then
+  cp -a "$SQUASH_ROOT/etc/resolv.conf" "$SQUASH_ROOT/etc/resolv.conf.ehot-bak"
+  RESOLV_BACKUP_NEEDED=1
+fi
+cp -L /etc/resolv.conf "$SQUASH_ROOT/etc/resolv.conf"
 mkdir -p "$SQUASH_ROOT/opt/ehot-os-src"
 cp -r "$REPO_ROOT/modules" "$REPO_ROOT/docs" "$REPO_ROOT/build" "$SQUASH_ROOT/opt/ehot-os-src/"
 
@@ -94,7 +111,6 @@ chroot "$SQUASH_ROOT" /bin/bash /opt/ehot-os-src/build/chroot/customize-rootfs.s
 
 cleanup_chroot
 trap - EXIT
-: > "$SQUASH_ROOT/etc/resolv.conf"
 
 # Keep original casper /casper/vmlinuz & /casper/initrd.lz intact so casper-uuid stays 100% synced
 # with /.disk/casper-uuid-generic, grub.cfg, and isolinux/live.cfg (target HDD rebuilds initramfs in ehot-install).

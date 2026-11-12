@@ -5,6 +5,7 @@
   "required_packages": [
     "steam-installer",
     "wine-installer",
+    "wine32",
     "winetricks",
     "lutris",
     "gamemode",
@@ -12,7 +13,6 @@
     "libgamemode0",
     "libgamemode0:i386",
     "mangohud",
-    "mangohud:i386",
     "vulkan-tools",
     "libvulkan1",
     "libvulkan1:i386",
