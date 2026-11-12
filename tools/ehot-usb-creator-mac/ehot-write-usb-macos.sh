@@ -2,12 +2,16 @@
 set -euo pipefail
 
 # EHOT OS Safe USB Flasher for macOS (Bash 3.2+ / BSD tools compatible)
-# Supports two modes:
-#   [1] Full hybrid mode (UEFI + Legacy BIOS via sudo dd -> /dev/rdiskN, requires Mac admin password)
-#   [2] No-sudo UEFI FAT32 mode (diskutil eraseDisk FAT32 + bsdtar extract, no Mac password if diskutil allows)
+# Supports:
+#   - Auto-locating .iso or .iso.part.* across current folder, parent folder, and ~/Downloads/*
+#   - Optional automatic download from public GitHub Release v1.0.0 via curl + unzip
+#   - SHA-256 verification via macOS built-in `shasum -a 256`
+#   - Mode [1]: Full hybrid mode (UEFI + Legacy BIOS via sudo dd -> /dev/rdiskN)
+#   - Mode [2]: No-sudo UEFI FAT32 mode (diskutil eraseDisk FAT32 + bsdtar extract)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DEFAULT_ISO_NAME="ehot-os-22.3-xfce-amd64.iso"
+RELEASE_BASE_URL="${EHOT_RELEASE_URL:-https://github.com/Timofei2506/EHOT-OS/releases/download/v1.0.0}"
 
 pause_on_command_exit() {
   local rc=$?
@@ -135,29 +139,6 @@ verify_extracted_uefi_tree() {
   return 0
 }
 
-find_or_reassemble_iso() {
-  local work_dir="$1"
-  local candidate_iso="$work_dir/$DEFAULT_ISO_NAME"
-  if [[ -f "$candidate_iso" ]]; then
-    printf '%s\n' "$candidate_iso"
-    return 0
-  fi
-
-  if [[ -f "$work_dir/${DEFAULT_ISO_NAME}.part.aa" ]]; then
-    echo "[ehot-mac] Найдены многотомные части ${DEFAULT_ISO_NAME}.part.* в $work_dir" >&2
-    if [[ -f "$work_dir/${DEFAULT_ISO_NAME}.parts.sha256" ]]; then
-      echo "[ehot-mac] Проверка SHA-256 каждой части..." >&2
-      (cd "$work_dir" && shasum -a 256 -c "${DEFAULT_ISO_NAME}.parts.sha256" >&2)
-    fi
-    echo "[ehot-mac] Склейка томов в $candidate_iso (займёт ~15-30 секунд)..." >&2
-    cat "$work_dir/${DEFAULT_ISO_NAME}.part."* > "$candidate_iso"
-    printf '%s\n' "$candidate_iso"
-    return 0
-  fi
-
-  return 1
-}
-
 get_file_size_bytes() {
   local f="$1"
   if stat -f%z "$f" >/dev/null 2>&1; then
@@ -165,6 +146,123 @@ get_file_size_bytes() {
   else
     stat -c%s "$f"
   fi
+}
+
+sha256_of_file() {
+  local f="$1"
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$f" | awk '{print $1}'
+  else
+    sha256sum "$f" | awk '{print $1}'
+  fi
+}
+
+find_named_file_in_roots() {
+  local target_name="$1"
+  shift
+  local root found
+  for root in "$@"; do
+    [[ -d "$root" ]] || continue
+    found="$(find "$root" -maxdepth 3 -type f -name "$target_name" 2>/dev/null | head -n 1 || true)"
+    if [[ -n "$found" ]]; then
+      printf '%s\n' "$found"
+      return 0
+    fi
+  done
+  return 1
+}
+
+find_or_reassemble_iso() {
+  local primary_dir="$1"
+  local parent_dir
+  parent_dir="$(cd "$primary_dir/.." 2>/dev/null && pwd || printf '%s' "$primary_dir")"
+
+  local search_roots=("$primary_dir" "$parent_dir")
+  if [[ -d "$HOME/Downloads" && "$HOME/Downloads" != "$primary_dir" && "$HOME/Downloads" != "$parent_dir" ]]; then
+    search_roots+=("$HOME/Downloads")
+  fi
+
+  local existing_iso=""
+  existing_iso="$(find_named_file_in_roots "$DEFAULT_ISO_NAME" "${search_roots[@]}" || true)"
+  if [[ -n "$existing_iso" && -f "$existing_iso" ]]; then
+    printf '%s\n' "$existing_iso"
+    return 0
+  fi
+
+  local parts_sha=""
+  parts_sha="$(find_named_file_in_roots "${DEFAULT_ISO_NAME}.parts.sha256" "${search_roots[@]}" || true)"
+
+  local part_aa=""
+  part_aa="$(find_named_file_in_roots "${DEFAULT_ISO_NAME}.part.aa" "${search_roots[@]}" || true)"
+  if [[ -z "$part_aa" ]]; then
+    return 1
+  fi
+
+  local out_dir="$primary_dir"
+  local target_iso="$out_dir/$DEFAULT_ISO_NAME"
+  local part_paths=()
+
+  if [[ -n "$parts_sha" && -f "$parts_sha" ]]; then
+    echo "[ehot-mac] Найдены части образа. Проверка SHA-256 каждой части..." >&2
+    local expected_hash part_filename found_part actual_hash
+    while read -r expected_hash part_filename; do
+      [[ -z "$expected_hash" || -z "$part_filename" ]] && continue
+      part_filename="${part_filename#\*}"
+      found_part="$(find_named_file_in_roots "$part_filename" "${search_roots[@]}" || true)"
+      if [[ -z "$found_part" ]]; then
+        echo "ОШИБКА: не найдена часть образа '$part_filename' (скачайте и распакуйте оба ZIP-архива из релиза)." >&2
+        return 2
+      fi
+      actual_hash="$(sha256_of_file "$found_part")"
+      if [[ "$actual_hash" != "$expected_hash" ]]; then
+        echo "ОШИБКА SHA-256 для '$found_part': ожидалось $expected_hash, получено $actual_hash" >&2
+        return 2
+      fi
+      echo "  [OK] $part_filename" >&2
+      part_paths+=("$found_part")
+    done < "$parts_sha"
+  else
+    local suffix p
+    for suffix in aa ab ac ad; do
+      p="$(find_named_file_in_roots "${DEFAULT_ISO_NAME}.part.${suffix}" "${search_roots[@]}" || true)"
+      [[ -n "$p" ]] && part_paths+=("$p")
+    done
+  fi
+
+  if [[ "${#part_paths[@]}" -eq 0 ]]; then
+    return 1
+  fi
+
+  echo "[ehot-mac] Склейка ${#part_paths[@]} частей в $target_iso (займёт ~15–30 секунд)..." >&2
+  cat "${part_paths[@]}" > "$target_iso"
+
+  local iso_sha=""
+  iso_sha="$(find_named_file_in_roots "${DEFAULT_ISO_NAME}.sha256" "${search_roots[@]}" || true)"
+  if [[ -n "$iso_sha" && -f "$iso_sha" && ! -f "${target_iso}.sha256" ]]; then
+    cp "$iso_sha" "${target_iso}.sha256"
+  fi
+
+  printf '%s\n' "$target_iso"
+  return 0
+}
+
+download_release_zips_to_dir() {
+  local dest_dir="$1"
+  mkdir -p "$dest_dir"
+  local z1="EHOT-OS-v1.0.0-Part1.zip"
+  local z2="EHOT-OS-v1.0.0-Part2-and-Tools.zip"
+
+  echo "[ehot-mac] Скачивание $z1 (~1.8 ГБ) в $dest_dir..."
+  curl -fL --retry 3 --progress-bar -o "$dest_dir/$z1" "$RELEASE_BASE_URL/$z1"
+  echo "[ehot-mac] Распаковка $z1..."
+  unzip -oq "$dest_dir/$z1" -d "$dest_dir"
+  rm -f "$dest_dir/$z1"
+
+  echo "[ehot-mac] Скачивание $z2 (~1.85 ГБ) в $dest_dir..."
+  curl -fL --retry 3 --progress-bar -o "$dest_dir/$z2" "$RELEASE_BASE_URL/$z2"
+  echo "[ehot-mac] Распаковка $z2..."
+  unzip -oq "$dest_dir/$z2" -d "$dest_dir"
+  rm -f "$dest_dir/$z2"
 }
 
 flash_raw_with_sudo() {
@@ -211,18 +309,22 @@ flash_fat32_uefi_no_sudo() {
   fi
 
   sleep 2
-  local part_id="${target_id}s1"
-  local part_info vol_mount part_fs
-  part_info="$(diskutil info "/dev/$part_id" 2>/dev/null || true)"
-  vol_mount="$(parse_diskutil_field "$part_info" "Mount Point")"
-  part_fs="$(parse_diskutil_field "$part_info" "File System Personality")"
-
-  if [[ -z "$vol_mount" ]]; then
-    diskutil mount "/dev/$part_id" >/dev/null 2>&1 || true
-    part_info="$(diskutil info "/dev/$part_id" 2>/dev/null || true)"
-    vol_mount="$(parse_diskutil_field "$part_info" "Mount Point")"
-    part_fs="$(parse_diskutil_field "$part_info" "File System Personality")"
-  fi
+  local part_id="" vol_mount="" part_fs="" candidate_slice
+  for candidate_slice in "${target_id}s1" "${target_id}s2"; do
+    local p_info
+    p_info="$(diskutil info "/dev/$candidate_slice" 2>/dev/null || true)"
+    [[ -z "$p_info" ]] && continue
+    part_id="$candidate_slice"
+    vol_mount="$(parse_diskutil_field "$p_info" "Mount Point")"
+    part_fs="$(parse_diskutil_field "$p_info" "File System Personality")"
+    if [[ -z "$vol_mount" ]]; then
+      diskutil mount "/dev/$part_id" >/dev/null 2>&1 || true
+      p_info="$(diskutil info "/dev/$part_id" 2>/dev/null || true)"
+      vol_mount="$(parse_diskutil_field "$p_info" "Mount Point")"
+      part_fs="$(parse_diskutil_field "$p_info" "File System Personality")"
+    fi
+    [[ -n "$vol_mount" ]] && break
+  done
 
   if [[ "$erase_ok" -eq 0 ]]; then
     if [[ -n "$vol_mount" ]] && printf '%s' "$part_fs" | grep -qiE "FAT32|MS-DOS"; then
@@ -238,12 +340,11 @@ flash_fat32_uefi_no_sudo() {
   fi
 
   if [[ -z "$vol_mount" || ! -d "$vol_mount" ]]; then
-    echo "ОШИБКА: не удалось смонтировать FAT32-раздел /dev/$part_id." >&2
+    echo "ОШИБКА: не удалось смонтировать FAT32-раздел на /dev/$target_id." >&2
     exit 3
   fi
 
   echo "[4/5] Распаковка EHOT OS ISO на $vol_mount (займёт 2–6 минут, без sudo)..."
-  # On FAT32, ISO symlinks (like ubuntu -> . or dists/stable) cannot be created and are not needed for UEFI Live boot.
   local tar_rc=0
   tar --no-same-owner --no-same-permissions -xf "$iso_path" \
     --exclude 'ubuntu' --exclude './ubuntu' \
@@ -293,15 +394,26 @@ main() {
         ;;
     esac
   else
-    if ! iso_path="$(find_or_reassemble_iso "$work_dir")"; then
-      if [[ -d "$HOME/Downloads" ]] && iso_path="$(find_or_reassemble_iso "$HOME/Downloads")"; then
-        work_dir="$HOME/Downloads"
-      else
-        echo "Не найден файл $DEFAULT_ISO_NAME или тома ${DEFAULT_ISO_NAME}.part.*." >&2
-        echo "Положите этот скрипт в ту же папку, куда скачали файлы релиза, или укажите путь аргументом:" >&2
-        echo "  bash \"$0\" ~/Downloads/$DEFAULT_ISO_NAME" >&2
-        exit 1
+    local rc=0
+    iso_path="$(find_or_reassemble_iso "$work_dir")" || rc=$?
+    if [[ $rc -ne 0 || -z "$iso_path" ]]; then
+      if [[ $rc -eq 2 ]]; then
+        exit 2
       fi
+      echo "Образ $DEFAULT_ISO_NAME или части .part.* локально не найдены."
+      local dl_ans
+      read -r -p "Скачать автоматически из публичного GitHub Release v1.0.0 (~3.6 ГБ)? [y/N]: " dl_ans
+      case "$dl_ans" in
+        y|Y|yes|YES|д|Д|да|ДА)
+          local dl_dir="$HOME/Downloads/EHOT-OS-v1.0.0"
+          download_release_zips_to_dir "$dl_dir"
+          iso_path="$(find_or_reassemble_iso "$dl_dir")"
+          ;;
+        *)
+          echo "Скачайте EHOT-OS-v1.0.0-Part1.zip и EHOT-OS-v1.0.0-Part2-and-Tools.zip в Загрузки, распакуйте и запустите скрипт снова." >&2
+          exit 1
+          ;;
+      esac
     fi
   fi
 
@@ -405,6 +517,10 @@ case "${1:-}" in
   --self-test-verify-uefi)
     shift
     verify_extracted_uefi_tree "$@"
+    ;;
+  --self-test-reassemble)
+    shift
+    find_or_reassemble_iso "$@"
     ;;
   *)
     main "$@"

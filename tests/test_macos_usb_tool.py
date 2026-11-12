@@ -160,3 +160,43 @@ def test_verify_extracted_uefi_tree_checks_required_files_and_size(tmp_path):
     )
     assert res_ok.returncode == 0, res_ok.stdout + res_ok.stderr
 
+
+def test_reassemble_finds_parts_across_unzipped_sibling_folders(tmp_path):
+    import hashlib
+
+    dl = tmp_path / "Downloads"
+    dir1 = dl / "EHOT-OS-v1.0.0-Part1"
+    dir2 = dl / "EHOT-OS-v1.0.0-Part2-and-Tools"
+    dir1.mkdir(parents=True)
+    dir2.mkdir(parents=True)
+
+    part1 = b"EHOT_PART_1_" * 128
+    part2 = b"EHOT_PART_2_" * 128
+    full = part1 + part2
+
+    (dir1 / "ehot-os-22.3-xfce-amd64.iso.part.aa").write_bytes(part1)
+    (dir2 / "ehot-os-22.3-xfce-amd64.iso.part.ab").write_bytes(part2)
+    h1 = hashlib.sha256(part1).hexdigest()
+    h2 = hashlib.sha256(part2).hexdigest()
+    hfull = hashlib.sha256(full).hexdigest()
+    (dir2 / "ehot-os-22.3-xfce-amd64.iso.parts.sha256").write_text(
+        f"{h1}  ehot-os-22.3-xfce-amd64.iso.part.aa\n"
+        f"{h2}  ehot-os-22.3-xfce-amd64.iso.part.ab\n",
+        encoding="utf-8",
+    )
+    (dir2 / "ehot-os-22.3-xfce-amd64.iso.sha256").write_text(
+        f"{hfull}  ehot-os-22.3-xfce-amd64.iso\n",
+        encoding="utf-8",
+    )
+
+    res = subprocess.run(
+        ["bash", str(MAC_SCRIPT), "--self-test-reassemble", str(dir2)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert res.returncode == 0, res.stdout + res.stderr
+    out_iso = pathlib.Path(res.stdout.strip())
+    assert out_iso.exists()
+    assert out_iso.read_bytes() == full
+

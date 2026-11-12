@@ -9,17 +9,17 @@
 ### Способ A: Фирменный безопасный скрипт `EHOT-USB-Creator-macOS.command` (рекомендуется)
 Работает на **Apple Silicon (M1/M2/M3/M4)** и **Intel Mac** без установки сторонних программ (использует только встроенные `diskutil`, `shasum`, `dd`, `cat`).
 
-1. Скачайте из **GitHub Releases** (или получите от друга) в **одну папку** (например `Загрузки` / `Downloads`):
-   - `EHOT-USB-Creator-macOS.command`
-   - `ehot-os-22.3-xfce-amd64.iso.part.aa`
-   - `ehot-os-22.3-xfce-amd64.iso.part.ab`
-   - `ehot-os-22.3-xfce-amd64.iso.part.ac`
-   - `ehot-os-22.3-xfce-amd64.iso.sha256`
-   - `ehot-os-22.3-xfce-amd64.iso.parts.sha256`
+1. Скачайте с **GitHub Releases (`v1.0.0`)** удобным способом:
+   - **Способ 1 (2 архива в браузере):**
+     - `EHOT-OS-v1.0.0-Part1.zip` (~1.76 ГБ)
+     - `EHOT-OS-v1.0.0-Part2-and-Tools.zip` (~1.88 ГБ)
+     Распакуйте оба ZIP-архива двойным кликом в папке **Загрузки** (`~/Downloads`) — даже если они окажутся в разных подпапках, скрипт найдёт обе части автоматически.
+   - **Способ 2 (лёгкий старт ~7 КБ):**
+     Скачайте только `EHOT-OS-v1.0.0-macOS-AutoInstaller.zip` и распакуйте его — при запуске скрипт сам предложит скачать `Part1.zip` и `Part2-and-Tools.zip` с публичного GitHub Release и всё распаковать.
 2. Вставьте флешку **Kingston DataTraveler 64 ГБ** в Mac (через USB-A или переходник USB-C -> USB-A). Если macOS спросит «Разрешить подключение аксессуара?» — нажмите **Разрешить**.
-3. Откройте программу **Терминал** (`Cmd + Пробел` -> `Terminal`) и выполните:
+3. Откройте программу **Терминал** (`Cmd + Пробел` -> `Terminal`) и перетащите в него файл `EHOT-USB-Creator-macOS.command` (или перейдите в распакованную папку):
    ```bash
-   cd ~/Downloads
+   cd ~/Downloads/EHOT-OS-v1.0.0-Part2-and-Tools
    bash EHOT-USB-Creator-macOS.command
    ```
    *(Альтернативно: правый клик по `EHOT-USB-Creator-macOS.command` в Finder -> **Открыть**, чтобы обойти предупреждение Gatekeeper.)*

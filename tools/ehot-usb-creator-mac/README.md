@@ -25,15 +25,13 @@
 ## Использование на macOS
 
 ### Вариант 1: Через Терминал (самый надёжный, без предупреждений Gatekeeper)
-Скачайте в **одну папку** (например `Загрузки`) файлы релиза `v1.0.0`:
-- `EHOT-USB-Creator-macOS.command`
-- `ehot-os-22.3-xfce-amd64.iso.part.aa`, `.part.ab`, `.part.ac`
-- `ehot-os-22.3-xfce-amd64.iso.sha256`, `ehot-os-22.3-xfce-amd64.iso.parts.sha256`
+Скачайте и распакуйте из релиза `v1.0.0` в **Загрузки** (`~/Downloads`) архивы:
+- `EHOT-OS-v1.0.0-Part1.zip` и `EHOT-OS-v1.0.0-Part2-and-Tools.zip`
+  *(либо только лёгкий `EHOT-OS-v1.0.0-macOS-AutoInstaller.zip` — скрипт сам скачает части образа с публичного релиза)*
 
-Затем откройте **Терминал** и выполните:
+Затем откройте **Терминал** и запустите:
 ```bash
-cd ~/Downloads
-bash EHOT-USB-Creator-macOS.command
+bash ~/Downloads/EHOT-OS-v1.0.0-Part2-and-Tools/EHOT-USB-Creator-macOS.command
 ```
 
 ### Вариант 2: Двойной клик в Finder

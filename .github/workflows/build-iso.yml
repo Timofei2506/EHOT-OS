@@ -80,10 +80,10 @@ jobs:
         run: |
           bash build/scripts/test-iso-qemu.sh /tmp/ehot-out/ehot-os-22.3-xfce-amd64.iso
 
-      - name: Split ISO into <=1500 MiB parts for GitHub Releases (<2 GiB limit)
+      - name: Package ISO into <=2 GiB ZIP archives for GitHub Releases
         run: |
           cd /tmp/ehot-out
-          split -b 1500M -a 2 ehot-os-22.3-xfce-amd64.iso ehot-os-22.3-xfce-amd64.iso.part.
+          split -b 1850M -a 2 ehot-os-22.3-xfce-amd64.iso ehot-os-22.3-xfce-amd64.iso.part.
           sha256sum ehot-os-22.3-xfce-amd64.iso.part.* > ehot-os-22.3-xfce-amd64.iso.parts.sha256
           cat > reassemble.bat <<'BAT'
           @echo off
@@ -106,9 +106,22 @@ jobs:
           SH
           chmod +x reassemble.sh
           rm -f ehot-os-22.3-xfce-amd64.iso
-          ls -lh /tmp/ehot-out
+          zip -j -0 "EHOT-OS-${{ github.ref_name }}-Part1.zip" ehot-os-22.3-xfce-amd64.iso.part.aa
+          zip -j -0 "EHOT-OS-${{ github.ref_name }}-Part2-and-Tools.zip" \
+            ehot-os-22.3-xfce-amd64.iso.part.ab \
+            ehot-os-22.3-xfce-amd64.iso.sha256 \
+            ehot-os-22.3-xfce-amd64.iso.parts.sha256 \
+            reassemble.bat reassemble.sh \
+            "${{ github.workspace }}/tools/ehot-usb-creator-mac/EHOT-USB-Creator-macOS.command" \
+            "${{ github.workspace }}/release-assets/EHOT-USB-Creator-win-x64.exe" \
+            "${{ github.workspace }}/docs/04_USB_FLASH_GUIDE.md" \
+            "${{ github.workspace }}/docs/05_LENOVO_INSTALL_GUIDE.md"
+          zip -j -9 "EHOT-OS-${{ github.ref_name }}-macOS-AutoInstaller.zip" \
+            "${{ github.workspace }}/tools/ehot-usb-creator-mac/EHOT-USB-Creator-macOS.command" \
+            "${{ github.workspace }}/tools/ehot-usb-creator-mac/README.md"
+          ls -lh /tmp/ehot-out/*.zip
 
-      - name: Publish Release with ISO parts + USB Creator
+      - name: Publish Release with ZIP packages
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -117,14 +130,10 @@ jobs:
             TAG="${{ github.event.inputs.release_tag }}"
           fi
           ASSETS=(
-            /tmp/ehot-out/ehot-os-22.3-xfce-amd64.iso.part.*
+            "/tmp/ehot-out/EHOT-OS-${TAG}-Part1.zip"
+            "/tmp/ehot-out/EHOT-OS-${TAG}-Part2-and-Tools.zip"
+            "/tmp/ehot-out/EHOT-OS-${TAG}-macOS-AutoInstaller.zip"
             /tmp/ehot-out/ehot-os-22.3-xfce-amd64.iso.sha256
-            /tmp/ehot-out/ehot-os-22.3-xfce-amd64.iso.parts.sha256
-            /tmp/ehot-out/reassemble.bat
-            /tmp/ehot-out/reassemble.sh
-            tools/ehot-usb-creator-mac/EHOT-USB-Creator-macOS.command
-            release-assets/EHOT-USB-Creator-win-x64.exe
-            release-assets/EHOT-USB-Creator-win-x64.exe.sha256
           )
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "${ASSETS[@]}" --clobber
