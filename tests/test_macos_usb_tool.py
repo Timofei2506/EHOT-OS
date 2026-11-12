@@ -123,3 +123,40 @@ def test_blocks_external_non_usb_fixed_thunderbolt_drive():
     res_tb = run_parse_test("disk2", SAMPLE_THUNDERBOLT_FIXED_EXTERNAL)
     assert res_tb.returncode != 0
     assert "BLOCKED:not USB/removable" in res_tb.stdout
+
+
+def test_verify_extracted_uefi_tree_checks_required_files_and_size(tmp_path):
+    usb_dir = tmp_path / "EHOTUSB"
+    (usb_dir / "EFI" / "boot").mkdir(parents=True)
+    (usb_dir / "boot" / "grub").mkdir(parents=True)
+    (usb_dir / "casper").mkdir(parents=True)
+    (usb_dir / ".disk").mkdir(parents=True)
+
+    (usb_dir / "EFI" / "boot" / "bootx64.efi").write_bytes(b"EFI")
+    (usb_dir / "boot" / "grub" / "grub.cfg").write_text("menuentry EHOT {}\n", encoding="utf-8")
+    (usb_dir / "casper" / "vmlinuz").write_bytes(b"KERNEL")
+    (usb_dir / "casper" / "initrd.lz").write_bytes(b"INITRD")
+    (usb_dir / ".disk" / "casper-uuid-generic").write_text("1234\n", encoding="utf-8")
+
+    # Small/truncated squashfs must fail
+    sq = usb_dir / "casper" / "filesystem.squashfs"
+    sq.write_bytes(b"TINY")
+    res_small = subprocess.run(
+        ["bash", str(MAC_SCRIPT), "--self-test-verify-uefi", str(usb_dir)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert res_small.returncode != 0
+
+    # Sparse 600 MB file simulates intact squashfs (>500 MB threshold)
+    with open(sq, "wb") as fh:
+        fh.truncate(600_000_000)
+    res_ok = subprocess.run(
+        ["bash", str(MAC_SCRIPT), "--self-test-verify-uefi", str(usb_dir)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert res_ok.returncode == 0, res_ok.stdout + res_ok.stderr
+

@@ -2,11 +2,9 @@
 set -euo pipefail
 
 # EHOT OS Safe USB Flasher for macOS (Bash 3.2+ / BSD tools compatible)
-# - Combines .iso.part.* files automatically if needed
-# - Verifies SHA-256 via macOS built-in `shasum -a 256`
-# - Filters strictly to external, physical, non-virtual USB disks (`diskutil list external physical`)
-# - Blocks internal Mac SSD (disk0), virtual DMG images, and undersized drives
-# - Unmounts via `diskutil unmountDisk`, writes via raw `/dev/rdiskN` (`bs=4m`), verifies first 8 MiB, ejects
+# Supports two modes:
+#   [1] Full hybrid mode (UEFI + Legacy BIOS via sudo dd -> /dev/rdiskN, requires Mac admin password)
+#   [2] No-sudo UEFI FAT32 mode (diskutil eraseDisk FAT32 + bsdtar extract, no Mac password if diskutil allows)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DEFAULT_ISO_NAME="ehot-os-22.3-xfce-amd64.iso"
@@ -100,6 +98,43 @@ validate_macos_disk_info() {
   return 0
 }
 
+verify_extracted_uefi_tree() {
+  local mount_dir="$1"
+  if [[ -z "$mount_dir" || ! -d "$mount_dir" ]]; then
+    echo "ОШИБКА: каталог смонтированной флешки '$mount_dir' не найден." >&2
+    return 1
+  fi
+
+  local bootx64=""
+  bootx64="$(find "$mount_dir" -maxdepth 3 -iname 'bootx64.efi' 2>/dev/null | head -n 1 || true)"
+  if [[ -z "$bootx64" ]]; then
+    echo "ОШИБКА: на флешке не найден загрузчик EFI/boot/bootx64.efi." >&2
+    return 1
+  fi
+
+  local rel
+  for rel in \
+    "boot/grub/grub.cfg" \
+    "casper/vmlinuz" \
+    "casper/initrd.lz" \
+    "casper/filesystem.squashfs" \
+    ".disk/casper-uuid-generic"; do
+    if [[ ! -f "$mount_dir/$rel" ]]; then
+      echo "ОШИБКА: на флешке отсутствует обязательный файл $rel." >&2
+      return 1
+    fi
+  done
+
+  local sq_bytes
+  sq_bytes="$(get_file_size_bytes "$mount_dir/casper/filesystem.squashfs")"
+  if [[ -z "$sq_bytes" || "$sq_bytes" -lt 500000000 ]]; then
+    echo "ОШИБКА: casper/filesystem.squashfs скопирован не полностью ($sq_bytes байт)." >&2
+    return 1
+  fi
+
+  return 0
+}
+
 find_or_reassemble_iso() {
   local work_dir="$1"
   local candidate_iso="$work_dir/$DEFAULT_ISO_NAME"
@@ -130,6 +165,101 @@ get_file_size_bytes() {
   else
     stat -c%s "$f"
   fi
+}
+
+flash_raw_with_sudo() {
+  local iso_path="$1"
+  local target_id="$2"
+
+  echo
+  echo "[3/5] Размонтирование томов на /dev/$target_id..."
+  diskutil unmountDisk "/dev/$target_id"
+
+  echo "[4/5] Запись образа в /dev/r$target_id (введите пароль администратора Mac для sudo; Ctrl+T показывает прогресс)..."
+  echo "Подсказка: если у вас свой Mac без пароля (пустой пароль), macOS sudo его не примет —"
+  echo "временно задайте простой пароль в Системных настройках или перезапустите скрипт в режиме [2] (Без пароля)."
+  sudo dd if="$iso_path" of="/dev/r$target_id" bs=4m
+  sync
+
+  echo "[5/5] Контрольная проверка первых 8 МиБ и безопасное извлечение..."
+  local expected_head actual_head
+  expected_head="$(dd if="$iso_path" bs=1m count=8 2>/dev/null | shasum -a 256 | awk '{print $1}')"
+  actual_head="$(sudo dd if="/dev/r$target_id" bs=1m count=8 2>/dev/null | shasum -a 256 | awk '{print $1}')"
+  if [[ "$expected_head" != "$actual_head" ]]; then
+    echo "ОШИБКА ВЕРИФИКАЦИИ: записанные загрузочные сектора не совпадают с ISO!" >&2
+    echo "  Ожидалось:   $expected_head" >&2
+    echo "  Прочитано:   $actual_head" >&2
+    exit 2
+  fi
+
+  diskutil eject "/dev/$target_id"
+  echo
+  echo "ГОТОВО! Контрольная сумма 8 МиБ совпала ($actual_head), флешка /dev/$target_id безопасно извлечена."
+}
+
+flash_fat32_uefi_no_sudo() {
+  local iso_path="$1"
+  local target_id="$2"
+
+  echo
+  echo "[3/5] Форматирование /dev/$target_id в FAT32 (MBR) без sudo..."
+  local erase_ok=0
+  if diskutil eraseDisk FAT32 EHOTUSB MBRFormat "/dev/$target_id"; then
+    erase_ok=1
+  else
+    echo "Предупреждение: diskutil eraseDisk не выполнен без прав администратора." >&2
+  fi
+
+  sleep 2
+  local part_id="${target_id}s1"
+  local part_info vol_mount part_fs
+  part_info="$(diskutil info "/dev/$part_id" 2>/dev/null || true)"
+  vol_mount="$(parse_diskutil_field "$part_info" "Mount Point")"
+  part_fs="$(parse_diskutil_field "$part_info" "File System Personality")"
+
+  if [[ -z "$vol_mount" ]]; then
+    diskutil mount "/dev/$part_id" >/dev/null 2>&1 || true
+    part_info="$(diskutil info "/dev/$part_id" 2>/dev/null || true)"
+    vol_mount="$(parse_diskutil_field "$part_info" "Mount Point")"
+    part_fs="$(parse_diskutil_field "$part_info" "File System Personality")"
+  fi
+
+  if [[ "$erase_ok" -eq 0 ]]; then
+    if [[ -n "$vol_mount" ]] && printf '%s' "$part_fs" | grep -qiE "FAT32|MS-DOS"; then
+      echo "Найдена существующая файловая система $part_fs ($vol_mount). Очистка содержимого без форматирования..."
+      find "$vol_mount" -mindepth 1 -maxdepth 1 ! -name '.Trashes' ! -name '.Spotlight-V100' ! -name '.fseventsd' -exec rm -rf {} + 2>/dev/null || true
+    else
+      echo "ОШИБКА: macOS требует права администратора для смены файловой системы ($part_fs -> FAT32)." >&2
+      echo "Варианты:" >&2
+      echo "  1) Если это ваш Mac, но вход без пароля — временно поставьте пароль в Системных настройках (sudo не принимает пустой пароль)." >&2
+      echo "  2) Отформатируйте эту флешку в FAT32 на любом Windows/Android/Linux устройстве и запустите этот режим снова." >&2
+      exit 3
+    fi
+  fi
+
+  if [[ -z "$vol_mount" || ! -d "$vol_mount" ]]; then
+    echo "ОШИБКА: не удалось смонтировать FAT32-раздел /dev/$part_id." >&2
+    exit 3
+  fi
+
+  echo "[4/5] Распаковка EHOT OS ISO на $vol_mount (займёт 2–6 минут, без sudo)..."
+  # On FAT32, ISO symlinks (like ubuntu -> . or dists/stable) cannot be created and are not needed for UEFI Live boot.
+  local tar_rc=0
+  tar --no-same-owner --no-same-permissions -xf "$iso_path" \
+    --exclude 'ubuntu' --exclude './ubuntu' \
+    --exclude 'dists' --exclude './dists' \
+    -C "$vol_mount" || tar_rc=$?
+  if [[ "$tar_rc" -ne 0 ]]; then
+    echo "[ehot-mac] tar завершился с кодом $tar_rc (обычно из-за симлинков на FAT32) — проверяем целостность загрузочных файлов..."
+  fi
+  sync
+
+  echo "[5/5] Проверка загрузочных файлов UEFI и безопасное извлечение..."
+  verify_extracted_uefi_tree "$vol_mount"
+  diskutil eject "/dev/$target_id"
+  echo
+  echo "ГОТОВО (UEFI FAT32 без пароля)! Загрузочные файлы проверены, флешка /dev/$target_id безопасно извлечена."
+  echo "ВАЖНО при загрузке на Lenovo: в BIOS/UEFI должен быть выбран режим UEFI (и выключен Secure Boot)."
 }
 
 main() {
@@ -183,11 +313,23 @@ main() {
     echo "[1/5] Проверка контрольной суммы SHA-256 образа..."
     (cd "$(dirname "$iso_path")" && shasum -a 256 -c "$(basename "$sha_file")")
   else
-    echo "[1/5] Файл .sha256 рядом не найден — пропуск автопроверки (вы можете проверить хеш вручную)."
+    echo "[1/5] Файл .sha256 рядом не найден — пропуск автопроверки."
   fi
 
   local iso_bytes
   iso_bytes="$(get_file_size_bytes "$iso_path")"
+
+  echo
+  echo "Выберите режим записи флешки:"
+  echo "  [1] Полный режим (UEFI + Legacy BIOS через sudo dd — нужен пароль администратора Mac)"
+  echo "  [2] Режим БЕЗ пароля Mac (UEFI FAT32 без sudo — подходит для ноутбуков Lenovo с UEFI)"
+  local mode_choice
+  read -r -p "Ваш выбор (1 или 2, по умолчанию 1): " mode_choice
+  mode_choice="${mode_choice:-1}"
+  if [[ "$mode_choice" != "1" && "$mode_choice" != "2" ]]; then
+    echo "Неверный выбор режима." >&2
+    exit 1
+  fi
 
   echo
   echo "[2/5] Поиск внешних физических USB-накопителей (внутренний диск Mac скрыт защитой)..."
@@ -246,34 +388,25 @@ EOF
     exit 0
   fi
 
-  echo
-  echo "[3/5] Размонтирование томов на /dev/$target_id..."
-  diskutil unmountDisk "/dev/$target_id"
-
-  echo "[4/5] Запись образа в /dev/r$target_id (введите пароль пользователя Mac для sudo; наберите Ctrl+T для просмотра прогресса)..."
-  sudo dd if="$iso_path" of="/dev/r$target_id" bs=4m
-  sync
-
-  echo "[5/5] Контрольная проверка первых 8 МиБ и безопасное извлечение..."
-  local expected_head actual_head
-  expected_head="$(dd if="$iso_path" bs=1m count=8 2>/dev/null | shasum -a 256 | awk '{print $1}')"
-  actual_head="$(sudo dd if="/dev/r$target_id" bs=1m count=8 2>/dev/null | shasum -a 256 | awk '{print $1}')"
-  if [[ "$expected_head" != "$actual_head" ]]; then
-    echo "ОШИБКА ВЕРИФИКАЦИИ: записанные загрузочные сектора не совпадают с ISO!" >&2
-    echo "  Ожидалось:   $expected_head" >&2
-    echo "  Прочитано:   $actual_head" >&2
-    exit 2
+  if [[ "$mode_choice" == "1" ]]; then
+    flash_raw_with_sudo "$iso_path" "$target_id"
+  else
+    flash_fat32_uefi_no_sudo "$iso_path" "$target_id"
   fi
 
-  diskutil eject "/dev/$target_id"
-  echo
-  echo "ГОТОВО! Контрольная сумма 8 МиБ совпала ($actual_head), флешка /dev/$target_id безопасно извлечена."
   echo "Вставьте Kingston DataTraveler в выключенный Lenovo и выберите загрузку с USB (F12 / Fn+F12 / кнопка Novo)."
 }
 
-if [[ "${1:-}" == "--self-test-parse" ]]; then
-  shift
-  validate_macos_disk_info "$@"
-else
-  main "$@"
-fi
+case "${1:-}" in
+  --self-test-parse)
+    shift
+    validate_macos_disk_info "$@"
+    ;;
+  --self-test-verify-uefi)
+    shift
+    verify_extracted_uefi_tree "$@"
+    ;;
+  *)
+    main "$@"
+    ;;
+esac
