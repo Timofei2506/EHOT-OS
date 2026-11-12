@@ -83,9 +83,12 @@ install -Dm644 "$CFG_DIR/lightdm-ehot.conf" /etc/lightdm/slick-greeter.conf
 install -Dm755 "$MODULE_DIR/drivers/gpu_detect.py" /usr/local/lib/ehot-os/gpu_detect.py
 install -Dm755 "$MODULE_DIR/drivers/ehot-driver-setup.sh" /usr/local/sbin/ehot-driver-setup
 
-# Enable earlyoom and ufw firewall safely
+# Enable earlyoom and ufw firewall safely (avoid loading iptables inside chroot)
 systemctl enable earlyoom.service || true
-ufw --force enable || true
+systemctl enable ufw.service || true
+if [[ "$MODE" == "target" ]]; then
+  ufw --force enable || true
+fi
 
 if [[ "$MODE" == "target" ]]; then
   sysctl --system || true

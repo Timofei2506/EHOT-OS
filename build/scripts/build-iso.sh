@@ -14,6 +14,7 @@ WORK_DIR="${EHOT_BUILD_WORKDIR:-$BUILD_DIR/work}"
 CACHE_DIR="${EHOT_BUILD_CACHEDIR:-$BUILD_DIR/cache}"
 OUT_DIR="${EHOT_BUILD_OUTDIR:-$BUILD_DIR/output}"
 KEEP_BASE_ISO="${KEEP_BASE_ISO:-1}"
+RESUME_WORKDIR="${RESUME_WORKDIR:-0}"
 
 if [[ $EUID -ne 0 ]]; then
   echo "Ошибка: сборка squashfs/chroot требует root (запустите через sudo $0)." >&2
@@ -29,41 +30,58 @@ done
 
 mkdir -p "$WORK_DIR" "$CACHE_DIR" "$OUT_DIR"
 
-echo "[1/7] Получение и проверка официального ISO Linux Mint $MINT_VERSION XFCE..."
-bash "$SCRIPT_DIR/download-mint-iso.sh" "$CACHE_DIR"
 BASE_ISO="$CACHE_DIR/$MINT_ISO_FILENAME"
-
 ISO_EXTRACT="$WORK_DIR/iso_extract"
 SQUASH_ROOT="$WORK_DIR/squashfs-root"
-rm -rf "$ISO_EXTRACT" "$SQUASH_ROOT"
-mkdir -p "$ISO_EXTRACT"
-
-echo "[2/7] Извлечение файлов ISO через xorriso..."
-xorriso -osirrox on -indev "$BASE_ISO" -extract / "$ISO_EXTRACT"
-chmod -R u+w "$ISO_EXTRACT"
-
-echo "[3/7] Распаковка casper/filesystem.squashfs..."
-unsquashfs -d "$SQUASH_ROOT" "$ISO_EXTRACT/casper/filesystem.squashfs"
-# Free ~2.9 GB immediately since filesystem.squashfs will be rebuilt in step 5
-rm -f "$ISO_EXTRACT/casper/filesystem.squashfs"
-
-# Extract El Torito boot params BEFORE optionally deleting BASE_ISO to save ~2.9 GB
 ELTORITO_ARGS_FILE="$WORK_DIR/xorriso_boot_args.txt"
-xorriso -indev "$BASE_ISO" -report_el_torito as_mkisofs 2>/dev/null > "$ELTORITO_ARGS_FILE"
-if [[ "$KEEP_BASE_ISO" == "0" ]] && ! grep -q -- "-append_partition" "$ELTORITO_ARGS_FILE"; then
-  dd if="$BASE_ISO" of="$WORK_DIR/mbr_header.bin" bs=2048 count=16 status=none
-  python3 - "$ELTORITO_ARGS_FILE" "$BASE_ISO" "$WORK_DIR/mbr_header.bin" <<'PY'
+
+if [[ "$RESUME_WORKDIR" == "1" && -d "$ISO_EXTRACT" && -d "$SQUASH_ROOT" && -f "$ELTORITO_ARGS_FILE" ]]; then
+  echo "[1-3/7] Продолжение сборки из существующего каталога $WORK_DIR..."
+else
+  echo "[1/7] Получение и проверка официального ISO Linux Mint $MINT_VERSION XFCE..."
+  bash "$SCRIPT_DIR/download-mint-iso.sh" "$CACHE_DIR"
+
+  rm -rf "$ISO_EXTRACT" "$SQUASH_ROOT"
+  mkdir -p "$ISO_EXTRACT"
+
+  echo "[2/7] Извлечение файлов ISO через xorriso..."
+  xorriso -osirrox on -indev "$BASE_ISO" -extract / "$ISO_EXTRACT"
+  chmod -R u+w "$ISO_EXTRACT"
+
+  echo "[3/7] Распаковка casper/filesystem.squashfs..."
+  unsquashfs -d "$SQUASH_ROOT" "$ISO_EXTRACT/casper/filesystem.squashfs"
+  # Free ~2.9 GB immediately since filesystem.squashfs will be rebuilt in step 5
+  rm -f "$ISO_EXTRACT/casper/filesystem.squashfs"
+
+  # Extract El Torito boot params BEFORE optionally deleting BASE_ISO to save ~2.9 GB
+  xorriso -indev "$BASE_ISO" -report_el_torito as_mkisofs 2>/dev/null > "$ELTORITO_ARGS_FILE"
+  if [[ "$KEEP_BASE_ISO" == "0" ]] && ! grep -q -- "-append_partition" "$ELTORITO_ARGS_FILE"; then
+    dd if="$BASE_ISO" of="$WORK_DIR/mbr_header.bin" bs=2048 count=16 status=none
+    python3 - "$ELTORITO_ARGS_FILE" "$BASE_ISO" "$WORK_DIR/mbr_header.bin" <<'PY'
 import sys
 p, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
 txt = open(p, encoding="utf-8").read()
 open(p, "w", encoding="utf-8").write(txt.replace(old, new))
 PY
-  rm -f "$BASE_ISO"
+    rm -f "$BASE_ISO"
+  fi
 fi
 
 echo "[4/7] Подготовка chroot-окружения и кастомизация EHOT OS..."
-RESOLV_TARGET=""
-RESOLV_BACKUP_NEEDED=0
+RESOLV_ORIG_TARGET=""
+if [[ -L "$SQUASH_ROOT/etc/resolv.conf" ]]; then
+  RESOLV_ORIG_TARGET="$(readlink "$SQUASH_ROOT/etc/resolv.conf")"
+fi
+
+restore_chroot_resolv() {
+  if [[ -n "${RESOLV_ORIG_TARGET:-}" && -d "$SQUASH_ROOT/etc" ]]; then
+    rm -f "$SQUASH_ROOT/etc/resolv.conf" 2>/dev/null || true
+    ln -snf "$RESOLV_ORIG_TARGET" "$SQUASH_ROOT/etc/resolv.conf" 2>/dev/null || true
+  elif [[ -d "$SQUASH_ROOT/etc" ]]; then
+    : > "$SQUASH_ROOT/etc/resolv.conf" 2>/dev/null || true
+  fi
+}
+
 cleanup_chroot() {
   set +e
   umount -lf "$SQUASH_ROOT/dev/pts" 2>/dev/null || true
@@ -72,12 +90,7 @@ cleanup_chroot() {
   umount -lf "$SQUASH_ROOT/sys" 2>/dev/null || true
   umount -lf "$SQUASH_ROOT/run" 2>/dev/null || true
   rm -f "$SQUASH_ROOT/usr/sbin/policy-rc.d"
-  if [[ -n "${RESOLV_TARGET:-}" ]]; then
-    rm -f "$SQUASH_ROOT/etc/resolv.conf"
-    ln -s "$RESOLV_TARGET" "$SQUASH_ROOT/etc/resolv.conf"
-  elif [[ "${RESOLV_BACKUP_NEEDED:-0}" -eq 1 ]] && [[ -f "$SQUASH_ROOT/etc/resolv.conf.ehot-bak" ]]; then
-    mv -f "$SQUASH_ROOT/etc/resolv.conf.ehot-bak" "$SQUASH_ROOT/etc/resolv.conf"
-  fi
+  restore_chroot_resolv
 }
 trap cleanup_chroot EXIT
 
@@ -88,15 +101,8 @@ exit 101
 EOF
 chmod 755 "$SQUASH_ROOT/usr/sbin/policy-rc.d"
 
-# Replace symlinked stub-resolv.conf with a regular file before bind-mounting /run
-# so DNS resolution inside chroot always uses host /etc/resolv.conf, then restore symlink.
-if [[ -L "$SQUASH_ROOT/etc/resolv.conf" ]]; then
-  RESOLV_TARGET="$(readlink "$SQUASH_ROOT/etc/resolv.conf")"
-  rm -f "$SQUASH_ROOT/etc/resolv.conf"
-elif [[ -f "$SQUASH_ROOT/etc/resolv.conf" ]]; then
-  cp -a "$SQUASH_ROOT/etc/resolv.conf" "$SQUASH_ROOT/etc/resolv.conf.ehot-bak"
-  RESOLV_BACKUP_NEEDED=1
-fi
+# Remove Mint's dangling symlink (../run/systemd/resolve/stub-resolv.conf) before copying host DNS
+rm -f "$SQUASH_ROOT/etc/resolv.conf"
 cp -L /etc/resolv.conf "$SQUASH_ROOT/etc/resolv.conf"
 mkdir -p "$SQUASH_ROOT/opt/ehot-os-src"
 cp -r "$REPO_ROOT/modules" "$REPO_ROOT/docs" "$REPO_ROOT/build" "$SQUASH_ROOT/opt/ehot-os-src/"
@@ -130,11 +136,11 @@ printf '%s' "$(du -sx --block-size=1 "$SQUASH_ROOT" | cut -f1)" > "$ISO_EXTRACT/
 # Free space early if requested (e.g. on CI runners)
 rm -rf "$SQUASH_ROOT"
 
-# Customize GRUB & ISOLINUX live menu labels safely while preserving original casper parameters & uuid
+# Customize GRUB & ISOLINUX live menu labels safely (ASCII-only in GRUB to guarantee readable fonts in UEFI/BIOS)
 for cfg in "$ISO_EXTRACT/boot/grub/grub.cfg" "$ISO_EXTRACT/boot/grub/loopback.cfg"; do
   if [[ -f "$cfg" ]]; then
-    sed -i 's/Start Linux Mint .* (compatibility mode)/EHOT OS 22.3 (Безопасный режим графики)/g' "$cfg"
-    sed -i 's/Start Linux Mint [^"]*/EHOT OS 22.3 (Запуск и установка)/g' "$cfg"
+    sed -i 's/Start Linux Mint .* (compatibility mode)/EHOT OS 22.3 (Safe Graphics - nomodeset)/g' "$cfg"
+    sed -i 's/Start Linux Mint [^"]*/EHOT OS 22.3 (Live \& Install)/g' "$cfg"
   fi
 done
 if [[ -f "$ISO_EXTRACT/isolinux/live.cfg" ]]; then
