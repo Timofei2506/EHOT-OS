@@ -1,0 +1,26 @@
+{
+  "policies": {
+    "DisableTelemetry": true,
+    "DisableFirefoxStudies": true,
+    "DisablePocket": true,
+    "DontCheckDefaultBrowser": true,
+    "FirefoxHome": {
+      "Search": true,
+      "TopSites": true,
+      "SponsoredTopSites": false,
+      "Highlights": false,
+      "Pocket": false,
+      "SponsoredPocket": false,
+      "Snippets": false
+    },
+    "UserMessaging": {
+      "WhatsNew": false,
+      "ExtensionRecommendations": false,
+      "FeatureRecommendations": false,
+      "SkipOnboarding": true
+    },
+    "ExtensionSettings": {
+      "_comment_ehot": "After signing modules/ehot-control/extension via Mozilla AMO unlisted channel, place install_url or local signed .xpi file:/// path under ehot-monitor@ehotos.local"
+    }
+  }
+}

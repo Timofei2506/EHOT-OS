@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "EHOT OS Monitor",
+  "version": "1.0.0",
+  "description": "Отправка уведомлений о начале просмотра YouTube и начале загрузок в локальный агент EHOT OS Control без сбора остальной истории.",
+  "permissions": [
+    "downloads",
+    "webNavigation",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "*://youtu.be/*"
+  ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "ehot-monitor@ehotos.local",
+      "strict_min_version": "121.0"
+    }
+  }
+}

@@ -1,0 +1,129 @@
+name: Build EHOT OS ISO & Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag for publishing ISO parts + USB Creator (e.g. v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-win-flasher:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build EHOT-USB-Creator-win-x64.exe
+        run: |
+          dotnet publish tools/ehot-usb-creator-win/EhotUsbCreator.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -o dist-win
+          Move-Item dist-win/EHOT-USB-Creator.exe dist-win/EHOT-USB-Creator-win-x64.exe
+          $hash = (Get-FileHash dist-win/EHOT-USB-Creator-win-x64.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  EHOT-USB-Creator-win-x64.exe" | Out-File -Encoding ascii dist-win/EHOT-USB-Creator-win-x64.exe.sha256
+
+      - name: Upload USB Creator artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ehot-usb-creator-win-x64
+          path: |
+            dist-win/EHOT-USB-Creator-win-x64.exe
+            dist-win/EHOT-USB-Creator-win-x64.exe.sha256
+          retention-days: 14
+
+  build-and-test-iso:
+    runs-on: ubuntu-24.04
+    needs: build-win-flasher
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free runner disk space for ISO remastering
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          df -h
+
+      - name: Install ISO build & QEMU tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xorriso squashfs-tools curl gnupg jq qemu-system-x86 ovmf gdisk parted
+
+      - name: Download Windows USB Creator artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ehot-usb-creator-win-x64
+          path: release-assets
+
+      - name: Build EHOT OS ISO (verified Mint 22.3 XFCE base)
+        run: |
+          mkdir -p /tmp/ehot-work /tmp/ehot-cache /tmp/ehot-out
+          sudo EHOT_BUILD_WORKDIR=/tmp/ehot-work \
+               EHOT_BUILD_CACHEDIR=/tmp/ehot-cache \
+               EHOT_BUILD_OUTDIR=/tmp/ehot-out \
+               KEEP_BASE_ISO=0 \
+               bash build/scripts/build-iso.sh
+
+      - name: Smoke-test ISO in QEMU (BIOS & UEFI)
+        run: |
+          bash build/scripts/test-iso-qemu.sh /tmp/ehot-out/ehot-os-22.3-xfce-amd64.iso
+
+      - name: Split ISO into <=1500 MiB parts for GitHub Releases (<2 GiB limit)
+        run: |
+          cd /tmp/ehot-out
+          split -b 1500M -a 2 ehot-os-22.3-xfce-amd64.iso ehot-os-22.3-xfce-amd64.iso.part.
+          sha256sum ehot-os-22.3-xfce-amd64.iso.part.* > ehot-os-22.3-xfce-amd64.iso.parts.sha256
+          cat > reassemble.bat <<'BAT'
+          @echo off
+          copy /b ehot-os-22.3-xfce-amd64.iso.part.* ehot-os-22.3-xfce-amd64.iso
+          certutil -hashfile ehot-os-22.3-xfce-amd64.iso SHA256
+          type ehot-os-22.3-xfce-amd64.iso.sha256
+          pause
+          BAT
+          cat > reassemble.sh <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          sha256sum -c ehot-os-22.3-xfce-amd64.iso.parts.sha256
+          cat ehot-os-22.3-xfce-amd64.iso.part.* > ehot-os-22.3-xfce-amd64.iso
+          sha256sum -c ehot-os-22.3-xfce-amd64.iso.sha256
+          SH
+          chmod +x reassemble.sh
+          rm -f ehot-os-22.3-xfce-amd64.iso
+          ls -lh /tmp/ehot-out
+
+      - name: Publish Release with ISO parts + USB Creator
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TAG="${{ github.event.inputs.release_tag }}"
+          fi
+          ASSETS=(
+            /tmp/ehot-out/ehot-os-22.3-xfce-amd64.iso.part.*
+            /tmp/ehot-out/ehot-os-22.3-xfce-amd64.iso.sha256
+            /tmp/ehot-out/ehot-os-22.3-xfce-amd64.iso.parts.sha256
+            /tmp/ehot-out/reassemble.bat
+            /tmp/ehot-out/reassemble.sh
+            release-assets/EHOT-USB-Creator-win-x64.exe
+            release-assets/EHOT-USB-Creator-win-x64.exe.sha256
+          )
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+          else
+            gh release create "$TAG" "${ASSETS[@]}" \
+              --title "EHOT OS $TAG (Linux Mint 22.3 XFCE)" \
+              --notes "Собранный и проверенный в QEMU образ EHOT OS + EHOT-USB-Creator-win-x64.exe для Windows. Скачайте EHOT-USB-Creator-win-x64.exe, все .part.* файлы и .sha256 в одну папку; утилита для Windows автоматически потоково запишет части на флешку Kingston DataTraveler."
+          fi

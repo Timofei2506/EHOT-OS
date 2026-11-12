@@ -1,0 +1,14 @@
+[Unit]
+Description=EHOT OS Control Boot Notification
+After=network-online.target ehot-control.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ehotcontrol
+Group=ehotcontrol
+ExecStart=/usr/bin/python3 /usr/local/lib/ehot-control/cli.py event boot --retries 8 --delay 8
+TimeoutStartSec=90
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=EHOT OS First-Boot Hardware & Setup Helper
+After=network-online.target multi-user.target
+Wants=network-online.target
+ConditionPathExists=!/var/lib/ehot-os/firstboot.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ehot-firstboot
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

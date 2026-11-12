@@ -1,0 +1,41 @@
+# EHOT OS Plymouth Boot Script
+# Displays designer logo.png when provided; otherwise clean black-violet text splash.
+
+Window.SetBackgroundTopColor(0.043, 0.035, 0.078);
+Window.SetBackgroundBottomColor(0.078, 0.063, 0.149);
+
+screen_w = Window.GetWidth();
+screen_h = Window.GetHeight();
+
+# Optional designer logo slot (no fake random mascot generated)
+logo_image = Image("logo.png");
+if (logo_image) {
+  logo_sprite = Sprite(logo_image);
+  logo_sprite.SetX(screen_w / 2 - logo_image.GetWidth() / 2);
+  logo_sprite.SetY(screen_h / 2 - logo_image.GetHeight() / 2 - 40);
+} else {
+  title_image = Image.Text("EHOT OS", 0.96, 0.95, 1.0, 1.0, "Sans Bold 28");
+  title_sprite = Sprite(title_image);
+  title_sprite.SetX(screen_w / 2 - title_image.GetWidth() / 2);
+  title_sprite.SetY(screen_h / 2 - 45);
+}
+
+# Minimal violet progress bar
+bar_w = 240;
+bar_h = 6;
+bar_x = screen_w / 2 - bar_w / 2;
+bar_y = screen_h / 2 + 70;
+
+bg_box = Image.Text(" ", 1, 1, 1, 0);
+progress_ratio = 0.15;
+
+fun boot_progress_callback(duration, progress) {
+  progress_ratio = progress;
+  pct = Math.Int(progress * 100);
+  status_img = Image.Text("Загрузка системы... " + pct + "%", 0.65, 0.55, 0.98, 1.0, "Sans 11");
+  status_sprite = Sprite(status_img);
+  status_sprite.SetX(screen_w / 2 - status_img.GetWidth() / 2);
+  status_sprite.SetY(bar_y);
+}
+
+Plymouth.SetBootProgressFunction(boot_progress_callback);

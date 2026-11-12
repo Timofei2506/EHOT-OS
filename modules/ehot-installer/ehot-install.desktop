@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Установить EHOT OS
+Name[en]=Install EHOT OS
+Comment=Безопасная автоматическая установка EHOT OS на внутренний накопитель
+Exec=xfce4-terminal -T "Установщик EHOT OS" -e "sudo ehot-install; echo 'Нажмите Enter для закрытия...'; read"
+Icon=system-software-install
+Terminal=false
+Categories=System;
+StartupNotify=true

@@ -1,0 +1,9 @@
+button-title=EHOT OS
+button-icon=ehot-menu
+show-button-title=true
+show-button-icon=true
+position-search-alternate=true
+position-commands-alternate=true
+menu-width=440
+menu-height=520
+menu-opacity=100

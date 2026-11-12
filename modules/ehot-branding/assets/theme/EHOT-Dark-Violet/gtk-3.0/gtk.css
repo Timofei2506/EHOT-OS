@@ -1,0 +1,22 @@
+/* EHOT OS Dark-Violet lightweight GTK3 overrides */
+@import url("/usr/share/themes/Mint-Y-Dark-Purple/gtk-3.0/gtk.css");
+
+@define-color theme_bg_color #0B0914;
+@define-color theme_base_color #120E21;
+@define-color theme_selected_bg_color #8B5CF6;
+@define-color theme_selected_fg_color #FFFFFF;
+@define-color theme_fg_color #F4F3FF;
+
+.xfce4-panel,
+#whiskermenu-window {
+  background-color: #0B0914;
+  color: #F4F3FF;
+  border-color: #2A214A;
+}
+
+#whiskermenu-window treeview:selected,
+.xfce4-panel button:checked,
+.xfce4-panel button:hover {
+  background-color: #8B5CF6;
+  color: #FFFFFF;
+}

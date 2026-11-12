@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=EHOT Control: Пауза / Включение уведомлений
+Name[en]=EHOT Control: Toggle Monitoring
+Comment=Локально включить или отключить отправку уведомлений мониторинга в Telegram
+Exec=/usr/local/bin/ehot-control-toggle
+Icon=dialog-information
+Terminal=false
+Categories=System;Settings;
+Keywords=ehot;control;telegram;monitoring;privacy;

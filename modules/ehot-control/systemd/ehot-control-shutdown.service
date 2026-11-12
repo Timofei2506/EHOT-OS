@@ -1,0 +1,16 @@
+[Unit]
+Description=EHOT OS Control Shutdown Notification (best-effort)
+After=network-online.target NetworkManager.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=ehotcontrol
+Group=ehotcontrol
+ExecStart=/bin/true
+ExecStop=/usr/bin/python3 /usr/local/lib/ehot-control/cli.py event shutdown --retries 1
+TimeoutStopSec=6
+
+[Install]
+WantedBy=multi-user.target

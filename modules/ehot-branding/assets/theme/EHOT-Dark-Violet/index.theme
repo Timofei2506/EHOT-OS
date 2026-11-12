@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=EHOT-Dark-Violet
+Comment=EHOT OS Black & Violet lightweight theme (inherits Mint-Y-Dark-Purple)
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=EHOT-Dark-Violet
+MetacityTheme=EHOT-Dark-Violet
+IconTheme=ehot-os
+CursorTheme=Bibata-Modern-Classic
+ButtonLayout=menu:minimize,maximize,close

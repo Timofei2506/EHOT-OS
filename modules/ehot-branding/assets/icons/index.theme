@@ -1,0 +1,17 @@
+[Icon Theme]
+Name=ehot-os
+Comment=EHOT OS Icon Theme (inherits Papirus-Dark / Mint-Y-Purple; drop overrides into scalable/ or 48x48/)
+Inherits=Papirus-Dark,Mint-Y-Purple,Mint-Y,Adwaita,hicolor
+Directories=scalable/apps,48x48/apps
+
+[scalable/apps]
+Size=64
+MinSize=16
+MaxSize=256
+Type=Scalable
+Context=Applications
+
+[48x48/apps]
+Size=48
+Type=Fixed
+Context=Applications

@@ -1,0 +1,43 @@
+# Secrets and local credentials (NEVER commit secrets!)
+*.env
+.env.*
+!*.env.example
+secrets/
+*.key
+*.pem
+*.p12
+*.pfx
+*.token
+*credentials*
+.netrc
+
+# Build artifacts and temporary ISO files
+*.iso
+*.iso.sha256
+*.iso.part.*
+build/work/
+build/cache/
+build/output/
+tmp/
+out/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# .NET build artifacts
+tools/ehot-usb-creator-win/bin/
+tools/ehot-usb-creator-win/obj/
+
+# Firefox XPI build artifacts (keep source only unless explicitly packaged)
+modules/ehot-control/extension/web-ext-artifacts/
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+*.swp
+*~

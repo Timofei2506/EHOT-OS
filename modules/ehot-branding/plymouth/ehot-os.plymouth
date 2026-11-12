@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=EHOT OS
+Description=EHOT OS Black & Violet boot splash (auto-loads designer logo.png if present)
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/ehot-os
+ScriptFile=/usr/share/plymouth/themes/ehot-os/ehot-os.script

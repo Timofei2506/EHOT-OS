@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=AnyDesk: Включить/Отключить удалённый доступ
+Name[en]=AnyDesk: Toggle Remote Access
+Comment=Локально включить или отключить службу удалённого доступа EHOT OS
+Exec=/usr/local/bin/ehot-remote-toggle
+Icon=preferences-desktop-remote-desktop
+Terminal=false
+Categories=System;Settings;
+Keywords=anydesk;remote;ehot;control;

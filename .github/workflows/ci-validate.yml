@@ -1,0 +1,40 @@
+name: CI Validate
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate-linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install validation dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck gdisk python3-pytest jq
+
+      - name: Run full test and lint suite
+        run: bash tests/run_all_tests.sh
+
+  validate-win-flasher:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build Windows USB Creator (.exe)
+        run: |
+          dotnet publish tools/ehot-usb-creator-win/EhotUsbCreator.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -o dist-win
+          Get-ChildItem dist-win

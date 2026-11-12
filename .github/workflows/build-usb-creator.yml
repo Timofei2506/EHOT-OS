@@ -1,0 +1,58 @@
+name: Build Windows USB Creator
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag (e.g. usb-creator-v1.0.0) or empty to only attach artifact'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish standalone EHOT-USB-Creator-win-x64.exe
+        run: |
+          dotnet publish tools/ehot-usb-creator-win/EhotUsbCreator.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -o release-bin
+          Move-Item release-bin/EHOT-USB-Creator.exe release-bin/EHOT-USB-Creator-win-x64.exe
+          $hash = (Get-FileHash release-bin/EHOT-USB-Creator-win-x64.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  EHOT-USB-Creator-win-x64.exe" | Out-File -Encoding ascii release-bin/EHOT-USB-Creator-win-x64.exe.sha256
+
+      - name: Upload USB Creator artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ehot-usb-creator-win-x64
+          path: |
+            release-bin/EHOT-USB-Creator-win-x64.exe
+            release-bin/EHOT-USB-Creator-win-x64.exe.sha256
+          retention-days: 30
+
+      - name: Publish to GitHub Release (if tag supplied)
+        if: ${{ inputs.release_tag != '' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release-bin/EHOT-USB-Creator-win-x64.exe release-bin/EHOT-USB-Creator-win-x64.exe.sha256 --clobber
+          else
+            gh release create "$TAG" release-bin/EHOT-USB-Creator-win-x64.exe release-bin/EHOT-USB-Creator-win-x64.exe.sha256 \
+              --title "EHOT OS USB Creator ($TAG)" \
+              --notes "Утилита записи EHOT OS на флешку Kingston DataTraveler (Windows x64)."
+          fi

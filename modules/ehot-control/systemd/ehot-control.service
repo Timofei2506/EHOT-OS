@@ -1,0 +1,25 @@
+[Unit]
+Description=EHOT OS Control Monitoring Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ehotcontrol
+Group=ehotcontrol
+ExecStart=/usr/bin/python3 /usr/local/lib/ehot-control/ehot_control_agent.py
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=ehot-control
+RuntimeDirectoryMode=0755
+StateDirectory=ehot-control
+StateDirectoryMode=0750
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ReadWritePaths=/var/lib/ehot-control /run/ehot-control
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,4 @@
+# /etc/default/earlyoom
+# EHOT OS: Protect 4 GB RAM + HDD systems from total freeze on OOM
+
+EARLYOOM_ARGS="-r 60 -m 5 -s 10 --avoid '(^|/)(init|systemd|Xorg|lightdm|xfwm4|xfce4-session|xfce4-panel|anydesk|ehot-control)$' --prefer '(^|/)(firefox|Web Content|Isolated Web Co|steamwebhelper|soffice\\.bin)$'"

@@ -1,0 +1,9 @@
+{
+  "name": "com.ehotos.control",
+  "description": "EHOT OS Control Native Messaging Bridge (YouTube & Downloads events only)",
+  "path": "/usr/local/lib/ehot-control/ehot_native_host.py",
+  "type": "stdio",
+  "allowed_extensions": [
+    "ehot-monitor@ehotos.local"
+  ]
+}

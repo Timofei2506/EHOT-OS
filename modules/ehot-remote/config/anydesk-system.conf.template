@@ -1,0 +1,9 @@
+# /etc/anydesk/system.conf baseline template (EHOT OS Remote)
+# Passwords are NEVER stored in this template or in the ISO.
+# Unattended password is set locally via `sudo ehot-remote-setup`.
+
+# 1 = Show AnyDesk incoming session / notification window when AnyDesk runs
+ad.security.interactive_access=1
+ad.features.unattended=true
+ad.ui.show_tray_icon=true
+ad.privacy.privacy_mode=false

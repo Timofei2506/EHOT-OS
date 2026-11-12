@@ -1,0 +1,22 @@
+# EHOT OS XFWM4 lightweight flat black-violet window border theme
+active_color_1=#141026
+active_color_2=#141026
+active_hilight_1=#8B5CF6
+active_hilight_2=#8B5CF6
+active_shadow_1=#0B0914
+active_shadow_2=#0B0914
+active_text_color=#F4F3FF
+active_border_color=#8B5CF6
+inactive_color_1=#0B0914
+inactive_color_2=#0B0914
+inactive_text_color=#8E89AD
+inactive_border_color=#1F1936
+button_offset=4
+button_spacing=4
+maximized_offset=0
+title_horizontal_offset=8
+title_vertical_offset_active=2
+title_vertical_offset_inactive=2
+title_shadow_active=false
+title_shadow_inactive=false
+show_app_icon=true
