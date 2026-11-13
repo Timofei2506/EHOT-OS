@@ -221,3 +221,44 @@ def test_reassemble_rejects_lonely_part_aa_without_part_ab(tmp_path):
     assert res.returncode == 1
     assert not (dl / "ehot-os-22.3-xfce-amd64.iso").exists()
 
+
+def test_extract_candidate_disks_handles_leading_spaces_and_skips_internal_and_synthesized():
+    sample_list = """
+/dev/disk0 (internal, physical):
+   #:                       TYPE NAME                    SIZE       IDENTIFIER
+   0:      GUID_partition_scheme                        *500.3 GB   disk0
+
+/dev/disk1 (synthesized):
+   #:                       TYPE NAME                    SIZE       IDENTIFIER
+   0:      APFS Container Scheme -                      +500.0 GB   disk1
+
+  /dev/disk2 (external, physical):
+   #:                       TYPE NAME                    SIZE       IDENTIFIER
+   0:     FDisk_partition_scheme                        *62.0 GB    disk2
+
+/dev/disk3 (disk image):
+   0:     GUID_partition_scheme                        *5.0 GB     disk3
+"""
+    res = subprocess.run(
+        ["bash", str(MAC_SCRIPT), "--self-test-list", sample_list],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert res.returncode == 0
+    assert res.stdout.strip().splitlines() == ["disk2"]
+
+
+def test_accepts_older_total_size_and_usb_fixed_external():
+    sample_legacy_usb = """   Device Identifier:         disk3
+   Whole:                     Yes
+   Device / Media Name:       DataTraveler 3.0
+   Protocol:                  USB
+   Device Location:           External
+   Removable Media:           Fixed
+   Total Size:                62.0 GB (62,016,946,176 Bytes)
+"""
+    res = run_parse_test("disk3", sample_legacy_usb)
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert res.stdout.strip() == "OK|disk3|DataTraveler 3.0|USB|62.0 GB"
+

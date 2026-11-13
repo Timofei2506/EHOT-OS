@@ -43,7 +43,25 @@ parse_diskutil_field() {
 
 extract_disk_bytes() {
   local size_field="$1"
-  printf '%s\n' "$size_field" | sed -n 's/.*(\([0-9][0-9]*\) Bytes).*/\1/p' | head -n 1
+  printf '%s\n' "$size_field" | sed -n 's/.*(\([0-9][0-9,]*\) Bytes).*/\1/p' | tr -d ',' | head -n 1
+}
+
+extract_candidate_disks_from_list() {
+  local list_text="$1"
+  printf '%s\n' "$list_text" | awk '
+    /^[[:space:]]*\/dev\/disk[0-9]+/ {
+      lower = tolower($0)
+      if (index(lower, "internal") > 0 || index(lower, "synthesized") > 0 || index(lower, "disk image") > 0) {
+        next
+      }
+      dev = $1
+      gsub(/^\/dev\//, "", dev)
+      gsub(/:$/, "", dev)
+      if (dev ~ /^disk[1-9][0-9]*$/ && !seen[dev]++) {
+        print dev
+      }
+    }
+  '
 }
 
 validate_macos_disk_info() {
@@ -69,6 +87,9 @@ validate_macos_disk_info() {
   removable="$(parse_diskutil_field "$info_text" "Removable Media")"
   media_name="$(parse_diskutil_field "$info_text" "Device / Media Name")"
   size_str="$(parse_diskutil_field "$info_text" "Disk Size")"
+  if [[ -z "$size_str" ]]; then
+    size_str="$(parse_diskutil_field "$info_text" "Total Size")"
+  fi
   size_bytes="$(extract_disk_bytes "$size_str")"
 
   if [[ "$whole" != "Yes" ]]; then
@@ -83,7 +104,7 @@ validate_macos_disk_info() {
     echo "BLOCKED:virtual image ($virtual_flag)"
     return 1
   fi
-  if ! printf '%s' "$location" | grep -qi "External"; then
+  if [[ -n "$location" ]] && ! printf '%s' "$location" | grep -qi "External"; then
     echo "BLOCKED:location is not External ($location)"
     return 1
   fi
@@ -503,10 +524,16 @@ main() {
 
   echo
   echo "[2/5] Поиск внешних физических USB-накопителей (внутренний диск Mac скрыт защитой)..."
-  local raw_disks
-  raw_disks="$(diskutil list external physical 2>/dev/null | awk '/^\/dev\/disk[0-9]+/ {gsub("/dev/", "", $1); print $1}' || true)"
+  local list_out raw_disks
+  list_out="$(diskutil list external physical 2>/dev/null || true)"
+  raw_disks="$(extract_candidate_disks_from_list "$list_out")"
+  if [[ -z "$raw_disks" ]]; then
+    list_out="$(diskutil list 2>/dev/null || true)"
+    raw_disks="$(extract_candidate_disks_from_list "$list_out")"
+  fi
 
   local valid_lines=""
+  local reject_notes=""
   local valid_count=0
   local d
   for d in $raw_disks; do
@@ -516,11 +543,24 @@ main() {
       valid_count=$((valid_count + 1))
       valid_lines="${valid_lines}${res}
 "
+    else
+      reject_notes="${reject_notes}  - /dev/$d: ${res}
+"
     fi
   done
 
   if [[ "$valid_count" -eq 0 ]]; then
     echo "Подходящая внешняя USB-флешка (>= $((iso_bytes / 1048576)) МиБ) не найдена." >&2
+    if [[ -n "$reject_notes" ]]; then
+      echo "Проверенные внешние диски и причины отклонения:" >&2
+      printf '%s' "$reject_notes" >&2
+    else
+      echo "macOS (diskutil) не увидел ни одного внешнего физического USB-диска." >&2
+      echo "Проверьте: 1) нажали ли 'Разрешить аксессуар' во всплывающем окне macOS;" >&2
+      echo "           2) видна ли флешка в другом USB-порту / в 'Дисковой утилите';" >&2
+      echo "Вывод 'diskutil list':" >&2
+      diskutil list 2>&1 | head -n 30 >&2 || true
+    fi
     echo "Вставьте Kingston DataTraveler 64 ГБ в Mac и запустите скрипт снова." >&2
     exit 1
   fi
@@ -571,6 +611,10 @@ case "${1:-}" in
   --self-test-parse)
     shift
     validate_macos_disk_info "$@"
+    ;;
+  --self-test-list)
+    shift
+    extract_candidate_disks_from_list "$@"
     ;;
   --self-test-verify-uefi)
     shift
