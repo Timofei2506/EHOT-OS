@@ -7,6 +7,25 @@ set -euo pipefail
 STAMP_FILE="/var/lib/ehot-os/firstboot.done"
 LOG_FILE="/var/log/ehot-firstboot.log"
 
+# Product identity (EHOT OS by default; public edition overrides /etc/ehot-edition.conf)
+EDITION_CONF="/etc/ehot-edition.conf"
+PRODUCT_NAME="EHOT OS"
+TARGET_USERNAME="Regzen"
+if [[ -f "$EDITION_CONF" ]]; then
+  while IFS="=" read -r _key _val; do
+    _key="${_key//[$'\t']/}"
+    _key="${_key% }"
+    _val="${_val%\r}"
+    _val="${_val%\"}"; _val="${_val#\"}"
+    _sq="'"
+    _val="${_val%"$_sq"}"; _val="${_val#"$_sq"}"
+    case "$_key" in
+      PRODUCT_NAME)     [[ -n "$_val" ]] && PRODUCT_NAME="$_val" ;;
+      PRODUCT_USERNAME) [[ -n "$_val" ]] && TARGET_USERNAME="$_val" ;;
+    esac
+  done < "$EDITION_CONF"
+fi
+
 mkdir -p /var/lib/ehot-os
 if [[ -f "$STAMP_FILE" ]]; then
   exit 0
@@ -14,7 +33,7 @@ fi
 
 exec > >(tee -a "$LOG_FILE") 2>&1
 
-echo "[ehot-firstboot] Запуск первоначальной настройки оборудования EHOT OS..."
+echo "[ehot-firstboot] Запуск первоначальной настройки оборудования $PRODUCT_NAME..."
 
 if command -v ufw >/dev/null 2>&1; then
   ufw --force enable || true
@@ -25,9 +44,11 @@ if [[ -x /usr/local/sbin/ehot-driver-setup ]]; then
   /usr/local/sbin/ehot-driver-setup || echo "[ehot-firstboot] Предупреждение: драйверы будут доустановлены после появления сети."
 fi
 
-# Create desktop reminder for owner to finish AnyDesk & Telegram setup interactively
-if [[ -d /home/Regzen/Desktop ]]; then
-  cat > /home/Regzen/Desktop/ehot-finish-setup.desktop <<'EOF'
+# Reminder to finish the personal-edition remote/agent setup. The public edition does not
+# ship those helper scripts at all, so this block is skipped entirely there.
+if command -v ehot-remote-setup >/dev/null 2>&1 || command -v ehot-control-setup >/dev/null 2>&1; then
+  if [[ -d "/home/$TARGET_USERNAME/Desktop" ]]; then
+    cat > "/home/$TARGET_USERNAME/Desktop/ehot-finish-setup.desktop" <<'EOF'
 [Desktop Entry]
 Type=Application
 Version=1.0
@@ -38,8 +59,9 @@ Icon=preferences-system
 Terminal=false
 Categories=System;
 EOF
-  chmod +x /home/Regzen/Desktop/ehot-finish-setup.desktop
-  chown Regzen:Regzen /home/Regzen/Desktop/ehot-finish-setup.desktop || true
+    chmod +x "/home/$TARGET_USERNAME/Desktop/ehot-finish-setup.desktop"
+    chown "$TARGET_USERNAME:$TARGET_USERNAME" "/home/$TARGET_USERNAME/Desktop/ehot-finish-setup.desktop" || true
+  fi
 fi
 
 touch "$STAMP_FILE"

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=MfiSerli Dark Glass
+Comment=Dark glassmorphism theme of MfiSerli OS (teal accent on deep navy)
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=MfiSerli-Dark-Glass
+MetacityTheme=MfiSerli-Dark-Glass
+IconTheme=mfiserli
+CursorTheme=Bibata-Modern-Classic
+ButtonLayout=close,minimize,maximize:menu

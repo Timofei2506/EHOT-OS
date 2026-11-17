@@ -1,0 +1,10 @@
+button-title=
+button-icon=mfiserli-menu
+show-button-title=false
+show-button-icon=true
+position-search-alternate=true
+position-commands-alternate=true
+menu-width=500
+menu-height=560
+menu-opacity=94
+favorites=firefox.desktop,thunar.desktop,xfce4-terminal.desktop,steam.desktop,libreoffice-startcenter.desktop

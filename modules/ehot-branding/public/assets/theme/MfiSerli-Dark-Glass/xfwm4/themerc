@@ -1,0 +1,22 @@
+# MfiSerli OS XFWM4 flat glass navy-teal window border theme
+active_color_1=#0D1826
+active_color_2=#0D1826
+active_hilight_1=#22D3EE
+active_hilight_2=#22D3EE
+active_shadow_1=#050B12
+active_shadow_2=#050B12
+active_text_color=#EAF4FE
+active_border_color=#1E4562
+inactive_color_1=#070E17
+inactive_color_2=#070E17
+inactive_text_color=#6E8299
+inactive_border_color=#142435
+button_offset=4
+button_spacing=4
+maximized_offset=0
+title_horizontal_offset=8
+title_vertical_offset_active=2
+title_vertical_offset_inactive=2
+title_shadow_active=false
+title_shadow_inactive=false
+show_app_icon=true

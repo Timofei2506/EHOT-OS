@@ -10,6 +10,52 @@ REPO_ROOT="$(cd "$BUILD_DIR/.." && pwd)"
 # shellcheck disable=SC1091
 source "$BUILD_DIR/config/build.conf"
 
+# ---------------- Edition selection (kent = EHOT OS, public = MfiSerli OS) ----------------
+EDITION="kent"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --edition)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Ошибка: --edition требует значение (kent|public)" >&2
+        exit 1
+      fi
+      EDITION="$2"
+      shift 2
+      ;;
+    --edition=*)
+      EDITION="${1#--edition=}"
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+case "$EDITION" in
+  kent|public) ;;
+  *)
+    echo "Ошибка: неизвестная редакция '$EDITION' (допустимо: kent, public)" >&2
+    exit 1
+    ;;
+esac
+if [[ "$EDITION" == "public" ]]; then
+  # shellcheck disable=SC1090,SC1091
+  source "$BUILD_DIR/config/edition-public.conf"
+  EHOT_ISO_FILENAME="$EDITION_ISO_FILENAME"
+  EHOT_VOLUME_ID="$EDITION_VOLUME_ID"
+  PRODUCT_USERNAME="${PRODUCT_USERNAME:-user}"
+  PRODUCT_HOSTNAME="${PRODUCT_HOSTNAME:-mfiserli-pc}"
+else
+  PRODUCT_NAME="EHOT OS"
+  PRODUCT_VERSION="1.0.0"
+  EDITION_ID="ehot-os"
+  EDITION_PART_PREFIX="EHOT"
+  PRODUCT_USERNAME="Regzen"
+  PRODUCT_HOSTNAME="ehot-lenovo"
+fi
+export EHOT_EDITION="$EDITION" PRODUCT_NAME PRODUCT_VERSION EDITION_ID EDITION_PART_PREFIX PRODUCT_USERNAME PRODUCT_HOSTNAME
+echo "[build-iso] Редакция: $EDITION ($PRODUCT_NAME $PRODUCT_VERSION) -> ISO: $EHOT_ISO_FILENAME"
+
 WORK_DIR="${EHOT_BUILD_WORKDIR:-$BUILD_DIR/work}"
 CACHE_DIR="${EHOT_BUILD_CACHEDIR:-$BUILD_DIR/cache}"
 OUT_DIR="${EHOT_BUILD_OUTDIR:-$BUILD_DIR/output}"
@@ -113,6 +159,17 @@ mount -t proc proc "$SQUASH_ROOT/proc"
 mount -t sysfs sys "$SQUASH_ROOT/sys"
 mount --bind /run "$SQUASH_ROOT/run"
 
+# Pass the selected edition into the chroot via file (env is exported above as backup)
+cat > "$SQUASH_ROOT/opt/ehot-os-src/build/config/edition-active.conf" <<EOF
+EHOT_EDITION="$EDITION"
+EDITION_ID="$EDITION_ID"
+PRODUCT_NAME="$PRODUCT_NAME"
+PRODUCT_VERSION="$PRODUCT_VERSION"
+EDITION_PART_PREFIX="$EDITION_PART_PREFIX"
+PRODUCT_USERNAME="$PRODUCT_USERNAME"
+PRODUCT_HOSTNAME="$PRODUCT_HOSTNAME"
+EOF
+
 chroot "$SQUASH_ROOT" /bin/bash /opt/ehot-os-src/build/chroot/customize-rootfs.sh
 
 cleanup_chroot
@@ -139,17 +196,17 @@ rm -rf "$SQUASH_ROOT"
 # Customize GRUB & ISOLINUX live menu labels safely (ASCII-only in GRUB to guarantee readable fonts in UEFI/BIOS)
 for cfg in "$ISO_EXTRACT/boot/grub/grub.cfg" "$ISO_EXTRACT/boot/grub/loopback.cfg"; do
   if [[ -f "$cfg" ]]; then
-    sed -i 's/Start Linux Mint .* (compatibility mode)/EHOT OS 22.3 (Safe Graphics - nomodeset)/g' "$cfg"
-    sed -i 's/Start Linux Mint [^"]*/EHOT OS 22.3 (Live \& Install)/g' "$cfg"
+    sed -i "s/Start Linux Mint .* (compatibility mode)/${PRODUCT_NAME} 22.3 (Safe Graphics - nomodeset)/g" "$cfg"
+    sed -i "s/Start Linux Mint [^\"]*/${PRODUCT_NAME} 22.3 (Live \\& Install)/g" "$cfg"
   fi
 done
 if [[ -f "$ISO_EXTRACT/isolinux/live.cfg" ]]; then
-  sed -i 's/Welcome to Linux Mint .*/Welcome to EHOT OS 22.3 (Linux Mint XFCE Base)/g' "$ISO_EXTRACT/isolinux/live.cfg"
-  sed -i 's/menu label Start Linux Mint in compatibility mode/menu label Start EHOT OS (Safe Graphics \/ nomodeset)/g' "$ISO_EXTRACT/isolinux/live.cfg"
-  sed -i 's/menu label Start Linux Mint$/menu label Start EHOT OS (Live + Install)/g' "$ISO_EXTRACT/isolinux/live.cfg"
+  sed -i "s/Welcome to Linux Mint .*/Welcome to ${PRODUCT_NAME} 22.3 (Linux Mint XFCE Base)/g" "$ISO_EXTRACT/isolinux/live.cfg"
+  sed -i "s/menu label Start Linux Mint in compatibility mode/menu label Start ${PRODUCT_NAME} (Safe Graphics \\/ nomodeset)/g" "$ISO_EXTRACT/isolinux/live.cfg"
+  sed -i "s/menu label Start Linux Mint$/menu label Start ${PRODUCT_NAME} (Live + Install)/g" "$ISO_EXTRACT/isolinux/live.cfg"
 fi
 if [[ -f "$ISO_EXTRACT/.disk/info" ]]; then
-  echo "EHOT OS 1.0.0 (Linux Mint 22.3 Zena XFCE amd64)" > "$ISO_EXTRACT/.disk/info"
+  echo "${PRODUCT_NAME} ${PRODUCT_VERSION} (Linux Mint 22.3 Zena XFCE amd64)" > "$ISO_EXTRACT/.disk/info"
 fi
 
 echo "[6/7] Обновление md5sum.txt внутри ISO..."

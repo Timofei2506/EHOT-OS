@@ -1,0 +1,49 @@
+/* MfiSerli OS "Dark Glass" lightweight GTK3 overrides (Mint 22.3 XFCE) */
+@import url("/usr/share/themes/Mint-Y-Dark/gtk-3.0/gtk.css");
+
+@define-color theme_bg_color #0B1420;
+@define-color theme_base_color #0F1B2A;
+@define-color theme_fg_color #E8F1FA;
+@define-color theme_selected_bg_color #0E7490;
+@define-color theme_selected_fg_color #F0FBFF;
+@define-color accent_color #22D3EE;
+@define-color accent_color2 #38BDF8;
+
+/* Glass panel & Whisker menu */
+.xfce4-panel,
+#whiskermenu-window {
+  background-color: rgba(9, 18, 29, 0.86);
+  color: #E8F1FA;
+  border-color: rgba(34, 211, 238, 0.18);
+}
+
+/* Dock-style tasklist buttons: icon-only, glass on hover */
+#tasklist-button {
+  background-color: transparent;
+  border-radius: 10px;
+  margin: 2px 1px;
+  padding: 2px 6px;
+  color: #DCE9F5;
+}
+#tasklist-button:hover {
+  background-color: rgba(34, 211, 238, 0.16);
+}
+#tasklist-button:checked {
+  background-color: rgba(34, 211, 238, 0.28);
+}
+
+#whiskermenu-window treeview:selected,
+#whiskermenu-window button:hover,
+.xfce4-panel button:checked,
+.xfce4-panel button:hover {
+  background-color: rgba(34, 211, 238, 0.22);
+  color: #FFFFFF;
+}
+
+/* Rounded glass tooltips & popovers */
+tooltip {
+  background-color: rgba(9, 18, 29, 0.92);
+  color: #E8F1FA;
+  border-radius: 10px;
+  border: 1px solid rgba(34, 211, 238, 0.25);
+}

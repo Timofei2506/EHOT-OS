@@ -1,0 +1,10 @@
+[Configuration]
+ColorForeground=#DBE9F7
+ColorBackground=#0A1420
+ColorCursor=#22D3EE
+ColorPalette=#0A1420;#F87171;#4ADE80;#FBBF24;#38BDF8;#A78BFA;#22D3EE;#DCE9F5;#31465C;#FCA5A5;#86EFAC;#FDE68A;#7DD3FC;#C4B5FD;#67E8F9;#FFFFFF
+FontName=Monospace 10
+MiscDefaultGeometry=90x26
+MiscMenubarDefault=FALSE
+ScrollingLines=5000
+BackgroundMode=TERMINAL_BACKGROUND_SOLID

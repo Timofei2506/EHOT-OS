@@ -1,0 +1,8 @@
+[plymouth Theme]
+Name=MfiSerli OS
+Description=Dark glass boot splash for MfiSerli OS
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/mfiserli-os
+ScriptFile=/usr/share/plymouth/themes/mfiserli-os/mfiserli-os.script

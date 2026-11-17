@@ -10,6 +10,22 @@
 
 ---
 
+## Редакции: EHOT OS (kent) и MfiSerli OS (public)
+
+Репозиторий собирает **две редакции** одной и той же оптимизированной базы:
+
+- **EHOT OS «Kent Edition»** (по умолчанию) — личная сборка: удалённый доступ, агент контроля и родительские функции, чёрно-фиолетовая тема.
+- **MfiSerli OS «Public Edition»** (`--edition public`) — та же оптимизированная база, но **без** личных модулей контроля и удалённого доступа, с новым дизайном «Dark Glass» (dock снизу, бирюзовый акцент), обои «Aurora Glass» 4K и стеклянный Plymouth.
+
+```bash
+sudo bash build/scripts/build-iso.sh --edition public   # MfiSerli OS
+sudo bash build/scripts/build-iso.sh                    # EHOT OS (kent, как v1.0.0)
+```
+
+Подробности: `docs/09_PUBLIC_EDITION.md` и `modules/ehot-branding/public/EDITION.md`.
+
+---
+
 ## Архитектура проекта
 
 Система разделена на независимые документированные модули:

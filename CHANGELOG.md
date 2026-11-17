@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+### Added
+- Вторая редакция сборки: **MfiSerli OS (public)** через `build-iso.sh --edition public` — та же оптимизированная база Linux Mint 22.3 XFCE, но без личных модулей контроля/удалённого доступа и с новым дизайном «Dark Glass» (тема GTK/xfwm4 `MfiSerli-Dark-Glass`, dock-панель снизу `p=12`, обои «Aurora Glass» 3840×2160 + вариант для экрана входа, логотип-плитка «M», стеклянная Plymouth-тема, фон LightDM).
+- `build/config/edition-public.conf` + проброс редакции в chroot (`edition-active.conf`, `EHOT_EDITION`), редакционно-осведомлённые GRUB/ISOLINUX метки и `.disk/info`.
+- `modules/ehot-installer/ehot-edition.py` — редакционная идентичность установщика в рантайме (имя ОС, метки разделов `MFISERLI_ROOT`/`MFISERLIEFI`, bootloader-id, имя пользователя `user`, hostname `mfiserli-pc`); без конфига поведение идентично EHOT OS v1.0.0.
+- `ehot-firstboot.sh` создаёт напоминание о личной настройке только при наличии соответствующих helper-скриптов (публичная редакция их не содержит).
+- CI workflow `build-iso.yml`: поле `edition` (kent/public) с автоматической подстановкой имён ISO/ZIP (`MfiSerli-OS-vX.Y.Z-*.zip`).
+- `tests/test_public_edition.py` (10 тестов): публичная редакция не ссылается на личные модули, kent-only ветки в chroot, 4K-обои и все ассеты темы, стабильные дефолты установщика, dock снизу и брендинг установщика MfiSerli.
+
+### Changed
+- `build/scripts/build-iso.sh`: флаг `--edition kent|public` (по умолчанию kent, поведение v1.0.0 не изменилось).
+- `build/chroot/customize-rootfs.sh`: редакционные ветки установки модулей, брендинга, релиз-файла (`/etc/ehot-os-release` либо `/etc/mfiserli-os-release`) и `/etc/ehot-edition.conf`.
+
 ## [1.0.0] - 2026-11-12
 ### Added
 - Полная модульная архитектура EHOT OS на базе официальной Linux Mint 22.3 «Zena» XFCE (64-bit).
