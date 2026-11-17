@@ -82,3 +82,24 @@ GitHub Actions: workflow **Build EHOT OS ISO & Release** → `workflow_dispatch`
   запускаются для обеих редакций (`tests/run_all_tests.sh`).
 - Публичная редакция наследует политику запрета (Steam-клоны, мессенджер-десктоп и пр.
   не устанавливаются автоматически — список в `tests/test_manifests_and_policy.py`).
+
+## Публикация MfiSerli OS 1.0.0
+
+- **Релиз:** https://github.com/Timofei2506/EHOT-OS/releases/tag/mfiserli-os-v1.0.0
+- **ISO:** `mfiserli-os-22.3-xfce-amd64.iso` (3.5 ГБ), SHA-256
+  `6d57cf7e493a23e0dace58964d321a01d8697875553c4ec6a58043d6a5662d7f`
+- **Активы:** `MfiSerli-OS-1.0.0-Part1.zip` (1.92 ГБ), `MfiSerli-OS-1.0.0-Part2-and-Tools.zip`
+  (1.77 ГБ, внутри `.part.ab`, `reassemble.bat/.sh`, macOS-установщик `EHOT-USB-Creator-macOS-MfiSerli.command`,
+  `README-MfiSerli.md`), `MfiSerli-OS-1.0.0-macOS-AutoInstaller.zip`, `...iso.sha256`.
+- **Проверки при публикации:** volume `MFISERLI_22_3`, GRUB-метки «MfiSerli OS 22.3», `.disk/info`
+  «MfiSerli OS 1.0.0», smoke-тест QEMU BIOS (menu 99.99% пикселей) + UEFI — успешно; все ZIP
+  прошли `unzip -tq`; анонимная доступность каждого актива — HTTP 200.
+
+### Запись флешки для публичной редакции
+- **macOS** — `EHOT-USB-Creator-macOS-MfiSerli.command` (самостоятельная докачка частей из этого
+  релиза, склейка, проверка SHA-256, запись; режим `[2]` без sudo).
+- **Windows** — `reassemble.bat` → проверка SHA-256 → Rufus (DD) / balenaEtcher.
+- **Linux** — `reassemble.sh` → `dd` / balenaEtcher.
+
+Windows-помощник `EHOT-USB-Creator-win-x64.exe` в этом релизе **не публикуется** (он настроен на
+имена файлов Kent-редакции); для Windows используйте `reassemble.bat` + Rufus/Etcher.

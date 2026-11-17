@@ -13,6 +13,13 @@
 - `build/scripts/build-iso.sh`: флаг `--edition kent|public` (по умолчанию kent, поведение v1.0.0 не изменилось).
 - `build/chroot/customize-rootfs.sh`: редакционные ветки установки модулей, брендинга, релиз-файла (`/etc/ehot-os-release` либо `/etc/mfiserli-os-release`) и `/etc/ehot-edition.conf`.
 
+## [MfiSerli OS 1.0.0] - 2026-11-17
+### Released
+- Первый публичный релиз MfiSerli OS 1.0.0 (public edition): https://github.com/Timofei2506/EHOT-OS/releases/tag/mfiserli-os-v1.0.0
+- ISO `mfiserli-os-22.3-xfce-amd64.iso` (SHA-256 `6d57cf7e…5662d7f`), 2 части + `reassemble.{bat,sh}` + `EHOT-USB-Creator-macOS-MfiSerli.command`.
+- Проверено в QEMU: BIOS + UEFI загрузка, volume `MFISERLI_22_3`.
+- `download-mint-iso.sh`: докачка с `-C -`, HTTP/1.1, детект stall и ротация зеркал.
+
 ## [1.0.0] - 2026-11-12
 ### Added
 - Полная модульная архитектура EHOT OS на базе официальной Linux Mint 22.3 «Zena» XFCE (64-bit).
