@@ -19,6 +19,7 @@
 - ISO `mfiserli-os-22.3-xfce-amd64.iso` (SHA-256 `6d57cf7e…5662d7f`), 2 части + `reassemble.{bat,sh}` + `EHOT-USB-Creator-macOS-MfiSerli.command`.
 - Проверено в QEMU: BIOS + UEFI загрузка, volume `MFISERLI_22_3`.
 - `download-mint-iso.sh`: докачка с `-C -`, HTTP/1.1, детект stall и ротация зеркал.
+- Windows-помощник публичной редакции `EHOT-USB-Creator-MfiSerli-win-x64.exe` (`tools/ehot-usb-creator-win-public/`): Dark Glass UI (шаги 1-2-3, автопоиск образа, drag&drop, owner-draw список флешек, градиентный прогресс), тот же безопасный движок сырой записи; CI собирает оба `.exe`.
 
 ## [1.0.0] - 2026-11-12
 ### Added

@@ -1,0 +1,2 @@
+/var/tmp/mfiserli-win-out/EHOT-USB-Creator-MfiSerli.pdb
+/var/tmp/mfiserli-win-out/EHOT-USB-Creator-MfiSerli.exe

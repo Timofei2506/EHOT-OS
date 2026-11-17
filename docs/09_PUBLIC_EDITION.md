@@ -103,3 +103,12 @@ GitHub Actions: workflow **Build EHOT OS ISO & Release** → `workflow_dispatch`
 
 Windows-помощник `EHOT-USB-Creator-win-x64.exe` в этом релизе **не публикуется** (он настроен на
 имена файлов Kent-редакции); для Windows используйте `reassemble.bat` + Rufus/Etcher.
+
+## Windows-помощник для публичной редакции
+
+`EHOT-USB-Creator-MfiSerli-win-x64.exe` (SHA-256 `7136e4b16b16d3f4fee09db05698f3863d1fa18a47f550c22f881233b4f2dc56`,
+162 МБ, self-contained) — отдельный актив релиза `mfiserli-os-v1.0.0`. Интерфейс — Dark Glass:
+шаги 1-2-3, автопоиск образа (предпочитает `mfiserli-os-*`), drag&drop `.iso`, owner-draw список
+флешек со «★ рекомендую», градиентный прогресс-бар, проверка SHA-256 и верификация записи.
+Исходники: `tools/ehot-usb-creator-win-public/` (сборка см. README). Kent-версия
+(`tools/ehot-usb-creator-win/`) не изменялась.

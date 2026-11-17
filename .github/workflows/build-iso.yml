@@ -40,6 +40,17 @@ jobs:
           $hash = (Get-FileHash dist-win/EHOT-USB-Creator-win-x64.exe -Algorithm SHA256).Hash.ToLower()
           "$hash  EHOT-USB-Creator-win-x64.exe" | Out-File -Encoding ascii dist-win/EHOT-USB-Creator-win-x64.exe.sha256
 
+      - name: Build EHOT-USB-Creator-MfiSerli-win-x64.exe (public edition)
+        run: |
+          dotnet publish tools/ehot-usb-creator-win-public/EhotUsbCreatorPublic.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -o dist-win-public
+          Move-Item dist-win-public/EHOT-USB-Creator-MfiSerli.exe dist-win-public/EHOT-USB-Creator-MfiSerli-win-x64.exe
+          $hash = (Get-FileHash dist-win-public/EHOT-USB-Creator-MfiSerli-win-x64.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  EHOT-USB-Creator-MfiSerli-win-x64.exe" | Out-File -Encoding ascii dist-win-public/EHOT-USB-Creator-MfiSerli-win-x64.exe.sha256
+
       - name: Upload USB Creator artifact
         uses: actions/upload-artifact@v4
         with:
@@ -47,6 +58,8 @@ jobs:
           path: |
             dist-win/EHOT-USB-Creator-win-x64.exe
             dist-win/EHOT-USB-Creator-win-x64.exe.sha256
+            dist-win-public/EHOT-USB-Creator-MfiSerli-win-x64.exe
+            dist-win-public/EHOT-USB-Creator-MfiSerli-win-x64.exe.sha256
           retention-days: 14
 
   build-and-test-iso:
