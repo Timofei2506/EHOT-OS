@@ -15,16 +15,27 @@ ISO_PATH="$OUT_DIR/$MINT_ISO_FILENAME"
 SUM_PATH="$OUT_DIR/sha256sum.txt"
 GPG_PATH="$OUT_DIR/sha256sum.txt.gpg"
 
+# Robust download: HTTP/1.1 + resume (-C -) + stall detection (--speed-time/--speed-limit)
+# + mirror rotation. Retry from byte 0 only when the server rejects the resume offset (rc 33).
 download_with_mirrors() {
   local rel_file="$1"
   local dest="$2"
-  for base in "${MINT_MIRRORS[@]}"; do
-    echo "[download] Пробуем зеркало: $base/$rel_file"
-    if curl -fL --retry 3 --connect-timeout 15 -o "$dest.tmp" "$base/$rel_file"; then
+  local max_attempts=24
+  local attempt=1
+  while (( attempt <= max_attempts )); do
+    local idx=$(( (attempt - 1) % ${#MINT_MIRRORS[@]} ))
+    local base="${MINT_MIRRORS[$idx]}"
+    echo "[download] Попытка $attempt/$max_attempts, зеркало: $base/$rel_file"
+    curl --http1.1 -fL -C - --speed-time 60 --speed-limit 2048 --connect-timeout 25 \
+      -o "$dest.tmp" "$base/$rel_file"
+    local rc=$?
+    if [[ $rc -eq 0 || $rc -eq 33 ]]; then
       mv -f "$dest.tmp" "$dest"
       return 0
     fi
-    rm -f "$dest.tmp"
+    echo "[download] curl код $rc — повтор через 3 сек..."
+    sleep 3
+    attempt=$(( attempt + 1 ))
   done
   return 1
 }

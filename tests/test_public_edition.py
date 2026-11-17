@@ -172,3 +172,23 @@ def test_panel_dock_at_bottom_with_glass_theme():
     whisker = (PUBLIC / "xfce" / "whiskermenu-1.rc").read_text(encoding="utf-8")
     assert "button-icon=mfiserli-menu" in whisker
     assert "show-button-title=false" in whisker
+
+
+def test_mfiserli_mac_command_variant_is_self_contained():
+    cmd = REPO / "tools" / "ehot-usb-creator-mac" / "public" / "EHOT-USB-Creator-macOS-MfiSerli.command"
+    text = cmd.read_text(encoding="utf-8")
+    assert 'DEFAULT_ISO_NAME="mfiserli-os-22.3-xfce-amd64.iso"' in text
+    assert 'MfiSerli-OS-1.0.0-Part1.zip' in text
+    assert 'MfiSerli-OS-1.0.0-Part2-and-Tools.zip' in text
+    assert 'releases/download/mfiserli-os-v1.0.0' in text
+    assert "MFISERLI" in text  # FAT32 volume label
+    assert "Downloads/MfiSerli-OS-1.0.0" in text
+    # must keep the safety/robustness features of the kent original
+    assert "--http1.1" in text and "-C -" in text
+    assert 'find_or_reassemble_iso' in text or "find_named_file_in_roots" in text
+    for banned in ("EHOT-OS-v1.0.0", "ehot-os-22.3", "EHOTUSB"):
+        assert banned not in text
+    # kent original remains intact
+    orig = (REPO / "tools" / "ehot-usb-creator-mac" / "ehot-write-usb-macos.sh").read_text(encoding="utf-8")
+    assert 'DEFAULT_ISO_NAME="ehot-os-22.3-xfce-amd64.iso"' in orig
+    assert 'MfiSerli-OS-1.0.0-Part1.zip' not in orig
